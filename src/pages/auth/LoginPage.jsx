@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import styles from "./LoginPage.module.css";
+import { supabase } from "../../lib/supabase";
 
 const IconKakao = ({ size = 18, color = "var(--black-1)" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ display: "block" }}>
@@ -17,13 +18,7 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
-
-  const handleLogin = e => {
-    e.preventDefault();
-    if (onLoginSuccess) {
-      onLoginSuccess(email);
-    }
-  };
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleSignupClick = () => {
     if (onGoToSignup) {
@@ -33,10 +28,65 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
     }
   };
 
+  const handleLogin = e => {
+    e.preventDefault();
+
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage("이메일과 비밀번호를 모두 입력해 주세요.");
+      return;
+    }
+
+    if (email === "test@han77ilab.com" && password === "1234") {
+      setErrorMessage("");
+      if (onLoginSuccess) {
+        onLoginSuccess(email);
+      }
+    } else {
+      const goToSignup = window.confirm(
+        "가입되지 않은 계정이거나 비밀번호가 일치하지 않습니다.\n회원가입 페이지로 이동하시겠습니까?",
+      );
+
+      if (goToSignup) {
+        handleSignupClick();
+      } else {
+        setErrorMessage("아이디 또는 비밀번호가 잘못되었습니다.");
+      }
+    }
+  };
+
+  const handleSocialLogin = async provider => {
+    setErrorMessage("");
+
+    if (provider === "kakao") {
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "kakao",
+          options: {
+            redirectTo: "http://localhost:5173",
+          },
+        });
+
+        if (error) {
+          console.error("카카오 로그인 실패:", error.message);
+          setErrorMessage("카카오 로그인 진행 중 오류가 발생했습니다.");
+        }
+      } catch (err) {
+        console.error("카카오 로그인 예외 발생:", err);
+      }
+    } else if (provider === "naver") {
+      const NAVER_CLIENT_ID = "B3cP_MJX21Js9nHAJGrH";
+      const REDIRECT_URI = encodeURIComponent("http://localhost:5173");
+      const STATE = Math.random().toString(36).substring(3);
+
+      const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&state=${STATE}`;
+
+      window.location.href = naverAuthUrl;
+    }
+  };
+
   return (
     <div className={styles.outerWrapper} translate="no" lang="ko">
       <div className={styles.splitCard}>
-        {/* PC 전용 좌측 초록 브랜드 배너 */}
         <div className={styles.leftBanner}>
           <div>
             <h2 className={`text-subtitle-l ${styles.bannerTitle}`}>
@@ -53,16 +103,13 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
           <div className={`text-xs ${styles.bannerCopyright}`}>© Han77ilab Platform. All rights reserved.</div>
         </div>
 
-        {/* 우측 로그인 폼 */}
         <div className={styles.rightForm}>
           <div>
-            {/* 1. PC 전용 헤더 */}
             <div className={styles.pcHeader}>
               <h3 className={`text-subtitle-l ${styles.formTitle}`}>로그인</h3>
               <p className={`text-s ${styles.formSubtitle}`}>한끼랩 서비스 이용을 위한 계정 정보 입력</p>
             </div>
 
-            {/* 2. 모바일 전용 헤더 */}
             <div className={styles.mobileHeader}>
               <h2 className={`text-subtitle-l ${styles.mobileTitle}`}>
                 맛있는 맞춤 식단,
@@ -73,7 +120,6 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
             </div>
 
             <form onSubmit={handleLogin} className={styles.formGroup}>
-              {/* 이메일 */}
               <div style={{ marginBottom: "16px" }}>
                 <label className={`text-button-s ${styles.label}`}>이메일(아이디)</label>
                 <input
@@ -81,11 +127,13 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
                   className={`text-s ${styles.input}`}
                   placeholder="example@email.com"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={e => {
+                    setEmail(e.target.value);
+                    if (errorMessage) setErrorMessage("");
+                  }}
                 />
               </div>
 
-              {/* 비밀번호 */}
               <div style={{ marginBottom: "16px" }}>
                 <label className={`text-button-s ${styles.label}`}>비밀번호</label>
                 <input
@@ -93,11 +141,27 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
                   className={`text-s ${styles.input}`}
                   placeholder="영문, 숫자 포함 8자 입력"
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={e => {
+                    setPassword(e.target.value);
+                    if (errorMessage) setErrorMessage("");
+                  }}
                 />
               </div>
 
-              {/* 옵션 행 (PC: 좌/우 분리, 모바일: 로그인 상태 유지 우측 정렬) */}
+              {errorMessage && (
+                <div
+                  style={{
+                    color: "var(--danger)",
+                    fontSize: "var(--xsmall)",
+                    marginTop: "-8px",
+                    marginBottom: "12px",
+                    fontWeight: "500",
+                  }}
+                >
+                  {errorMessage}
+                </div>
+              )}
+
               <div className={`text-s ${styles.optionsRow}`}>
                 <label className={styles.checkboxLabel}>
                   <input
@@ -111,13 +175,11 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
                 <span className={`${styles.pcHeader} ${styles.findPasswordLink}`}>비밀번호 찾기</span>
               </div>
 
-              {/* 로그인 버튼 */}
               <button type="submit" className={`text-button-m ${styles.btnPrimaryLarge}`}>
                 로그인
               </button>
             </form>
 
-            {/* 모바일 전용 하단 3개 링크 */}
             <div className={`text-s ${styles.mobileFooter}`}>
               <span>아이디 찾기</span> &nbsp;|&nbsp;
               <span>비밀번호 찾기</span> &nbsp;|&nbsp;
@@ -126,26 +188,31 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
               </span>
             </div>
 
-            {/* 소셜 구분선 */}
             <div className={styles.dividerContainer}>
               <div className={styles.dividerLine} />
               <span className={`text-xs ${styles.dividerText}`}>또는 소셜 계정으로 로그인</span>
               <div className={styles.dividerLine} />
             </div>
 
-            {/* 소셜 버튼 (PC: 2열 / 모바일: 1열) */}
             <div className={styles.socialGrid}>
-              <button type="button" className={`text-button-s ${styles.btnKakao}`}>
+              <button
+                type="button"
+                className={`text-button-s ${styles.btnKakao}`}
+                onClick={() => handleSocialLogin("kakao")}
+              >
                 <IconKakao size={18} />
                 <span>카카오로 1초 만에 시작</span>
               </button>
-              <button type="button" className={`text-button-s ${styles.btnNaver}`}>
+              <button
+                type="button"
+                className={`text-button-s ${styles.btnNaver}`}
+                onClick={() => handleSocialLogin("naver")}
+              >
                 <IconNaver size={14} />
                 <span>네이버로 시작하기</span>
               </button>
             </div>
 
-            {/* PC 전용 하단 회원가입 안내 */}
             <div className={`text-s ${styles.pcFooter}`}>
               아직 회원이 아니신가요?
               <span onClick={handleSignupClick} className={styles.linkHighlight}>
@@ -153,7 +220,6 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
               </span>
             </div>
 
-            {/* 모바일 최하단 저작권 */}
             <div className={`text-xs ${styles.mobileCopyright}`}>© Han77ilabPlatform. All rights reserved.</div>
           </div>
         </div>
