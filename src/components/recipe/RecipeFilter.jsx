@@ -84,11 +84,11 @@ const removeAllergyFilter = item => {
   return ( 
     <div className={styles.filterPanel}>
       <div className={styles.sort}>
+        <p>필터</p>
         <span
         className="material-icons">
           sort
           </span>
-          <p>필터</p>
       </div>
       <div className={styles.filterBox}>
         <section className={styles.filterSection}>
