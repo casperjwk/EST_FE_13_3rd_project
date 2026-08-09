@@ -5,6 +5,7 @@ import style from "./RecipeListPage.module.css";
 import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { getRecips } from "../../services/recipeSearchService";
+import { filterRecipesByAllergies, filterRecipesByVeganType } from "../../utils/recipeFilter";
 
 
 const RECIPE_LOAD_COUNT = 6;
@@ -22,6 +23,16 @@ function RecipeListPage() {
   const [visibleCount, setVisibleCount] =useState(RECIPE_LOAD_COUNT);
   const [errorMessage, setErrorMessage] = useState("");
   const [sortType, setSortType] = useState("created");
+  const [veganFilter, setVeganFilter] = useState("일반");
+  const [allergyFilters, setAllergyFilters] = useState({});
+
+
+
+const allergyFilteredRecipes = filterRecipesByAllergies(recipes, allergyFilters);
+const filteredRecipes = filterRecipesByVeganType(allergyFilteredRecipes, veganFilter);
+
+const visibleRecipes = filteredRecipes.slice(0, visibleCount);
+const hasMoreRecipes = visibleCount < filteredRecipes.length;
 
 
   useEffect(() => {
@@ -59,16 +70,20 @@ function RecipeListPage() {
     setSortType(event.target.value);
   };
 
-  const visibleRecipes = recipes.slice(0, visibleCount);
-  const hasMoreRecipes = visibleCount < recipes.length;
+
 
   return (
     <div className={style.main}>
       <div className="container">
         <h2 className={`${style.title} text-title-m`}>레시피 둘러보기</h2>
-        <FilterPanel/>
+        <FilterPanel
+          allergyFilters={allergyFilters}
+          onAllergyChange={setAllergyFilters}
+          veganFilter={veganFilter}
+          onVeganChange={setVeganFilter}
+        />
         <div className={style.totalASortArea}>
-          <h3 className="text-l">총 {recipes.length}개</h3>
+          <h3 className="text-l">총 {filteredRecipes.length}개</h3>
           <label className={style.sortSelectLabel}>
             <select
               className={style.sortSelect}

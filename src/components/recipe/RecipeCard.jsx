@@ -38,6 +38,11 @@ function RecipeCard({
   hard: "어려움",
   }[difficulty];
 
+
+
+
+
+
   return(
     <div
       className={styles.cardBorder}
@@ -87,7 +92,32 @@ function RecipeCard({
         </div>
         
         
-        <div></div>
+        <div>
+          <button
+            type="button"
+            className={styles.recipeStatusBox}
+            onClick={onClick}
+          >
+            <div className={styles.recipeStatusLeft}>
+              <span className="material-symbols-outlined" aria-hidden="true">
+                auto_fix_high
+              </span>
+
+              <div>
+                <p>AI 맞춤 분석</p>
+                <span>알레르기·비건 조건 분석 준비중</span>
+              </div>
+            </div>
+
+            <div className={styles.recipeStatusAction}>
+              <span>준비중</span>
+              <span className="material-symbols-outlined" aria-hidden="true">
+                hourglass_empty
+              </span>
+            </div>
+          </button>
+        </div>
+        
       </div>
     </div>
   )
