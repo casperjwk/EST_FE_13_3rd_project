@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./LoginPage.module.css";
 import { supabase } from "../../lib/supabase";
 
@@ -20,6 +20,50 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  useEffect(() => {
+    const handleSocialAuthCallback = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error || !session?.user) return;
+
+        const user = session.user;
+        const rawMetaData = user.user_metadata || {};
+
+        const userEmail = user.email || "";
+        const nickname =
+          rawMetaData.full_name || rawMetaData.name || rawMetaData.nickname || userEmail.split("@")[0] || "사용자";
+        const profileImage = rawMetaData.avatar_url || rawMetaData.profile_image || "";
+
+        const { data: existingUser } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
+
+        if (!existingUser) {
+          const { error: insertError } = await supabase.from("profiles").insert({
+            id: user.id,
+            nickname: nickname,
+            profile_image_url: profileImage,
+            created_at: new Date().toISOString(),
+          });
+
+          if (insertError) {
+            console.error("profiles 저장 실패:", insertError.message);
+          }
+        }
+
+        if (onLoginSuccess) {
+          onLoginSuccess(userEmail);
+        }
+      } catch (err) {
+        console.error("소셜 로그인 DB 동기화 오류:", err);
+      }
+    };
+
+    handleSocialAuthCallback();
+  }, [onLoginSuccess]);
+
   const handleSignupClick = () => {
     if (onGoToSignup) {
       onGoToSignup();
@@ -28,7 +72,7 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
     }
   };
 
-  const handleLogin = e => {
+  const handleLogin = async e => {
     e.preventDefault();
 
     if (!email.trim() || !password.trim()) {
@@ -36,11 +80,20 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
       return;
     }
 
-    if (email === "test@han77ilab.com" && password === "1234") {
+    if (email === "test@han77ilab.com" && password === "Test1234!!") {
       setErrorMessage("");
+
+      if (keepLoggedIn) {
+        localStorage.setItem("keepLoggedIn", "true");
+      } else {
+        localStorage.removeItem("keepLoggedIn");
+      }
+
       if (onLoginSuccess) {
         onLoginSuccess(email);
       }
+
+      window.location.href = "/";
     } else {
       const goToSignup = window.confirm(
         "가입되지 않은 계정이거나 비밀번호가 일치하지 않습니다.\n회원가입 페이지로 이동하시겠습니까?",
@@ -57,12 +110,19 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
   const handleSocialLogin = async provider => {
     setErrorMessage("");
 
+    if (keepLoggedIn) {
+      localStorage.setItem("keepLoggedIn", "true");
+    }
+
     if (provider === "kakao") {
       try {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "kakao",
           options: {
             redirectTo: "http://localhost:5173",
+            queryParams: {
+              prompt: "login",
+            },
           },
         });
 
