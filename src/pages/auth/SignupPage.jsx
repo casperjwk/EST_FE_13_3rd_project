@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import SignupStep1 from "./SignupStep1";
 import SignupStep2 from "./SignupStep2";
+import { supabase } from "../../lib/supabase";
 
 export default function SignupPage() {
   const [step, setStep] = useState(1); // 1: 기본정보, 2: 식단정보선택
@@ -30,17 +31,74 @@ export default function SignupPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 회원가입 완료 ➔ 메인으로 이동
-  const handleCompleteSignup = (step2Data = {}) => {
+  // 📌 회원가입 최종 제출 ➔ Supabase Auth 및 profiles DB 연동
+  const handleCompleteSignup = async (step2Data = {}) => {
     const finalData = {
       ...signupData,
       ...step2Data,
     };
 
-    console.log("최종 회원가입 제출 데이터:", finalData);
+    try {
+      // 1. Supabase Auth 회원가입 진행 (이메일/비밀번호)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: finalData.email,
+        password: finalData.password,
+        options: {
+          data: {
+            nickname: finalData.nickname,
+          },
+        },
+      });
 
-    alert("회원가입이 완료되었습니다!");
-    window.location.href = "/"; // 메인 페이지 이동
+      if (authError) {
+        console.error("회원가입 에러:", authError.message);
+        alert(`회원가입 실패: ${authError.message}`);
+        return;
+      }
+
+      const user = authData?.user;
+
+      if (user) {
+        // 2. profiles DB 테이블에 유저 정보 저장 (vegan_type_id 예외 처리 강화)
+        const veganValue =
+          finalData.veganType && finalData.veganType !== "none" && !isNaN(finalData.veganType)
+            ? Number(finalData.veganType)
+            : null;
+
+        const { error: dbError } = await supabase.from("profiles").insert({
+          id: user.id,
+          nickname: finalData.nickname || "사용자",
+          vegan_type_id: veganValue,
+          created_at: new Date().toISOString(),
+        });
+
+        if (dbError) {
+          console.error("유저 프로필 DB 저장 오류:", dbError.message);
+          alert(`프로필 저장 실패: ${dbError.message}`);
+          return;
+        }
+
+        // 3. 알레르기 선택 정보 저장
+        if (finalData.allergies && finalData.allergies.length > 0) {
+          const allergyInserts = finalData.allergies.map(allergenId => ({
+            user_id: user.id,
+            allergen_id: allergenId,
+          }));
+
+          const { error: allergyError } = await supabase.from("user_allergies").insert(allergyInserts);
+
+          if (allergyError) {
+            console.error("알레르기 정보 DB 저장 오류:", allergyError.message);
+          }
+        }
+
+        alert("회원가입이 성공적으로 완료되었습니다!");
+        window.location.href = "/login";
+      }
+    } catch (err) {
+      console.error("회원가입 처리 중 예외 발생:", err);
+      alert("회원가입 진행 중 오류가 발생했습니다. 다시 시도해 주세요.");
+    }
   };
 
   // 로그인 페이지 이동
