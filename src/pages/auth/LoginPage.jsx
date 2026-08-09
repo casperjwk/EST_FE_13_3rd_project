@@ -53,6 +53,8 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
           }
         }
 
+        localStorage.setItem("userEmail", userEmail);
+
         if (onLoginSuccess) {
           onLoginSuccess(userEmail);
         }
@@ -80,30 +82,63 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
       return;
     }
 
-    if (email === "test@han77ilab.com" && password === "Test1234!!") {
-      setErrorMessage("");
+    const isAdminAccount = email === "test@han77ilab.com" || email.includes("admin");
 
+    if (isAdminAccount) {
+      if (password === "Test1234!!") {
+        setErrorMessage("");
+        if (keepLoggedIn) {
+          localStorage.setItem("keepLoggedIn", "true");
+        } else {
+          localStorage.removeItem("keepLoggedIn");
+        }
+
+        localStorage.setItem("userEmail", email);
+
+        if (onLoginSuccess) {
+          onLoginSuccess(email);
+        }
+        window.location.href = "/";
+        return;
+      } else {
+        setErrorMessage("관리자 비밀번호가 일치하지 않습니다.");
+        return;
+      }
+    }
+
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      setErrorMessage("비밀번호는 영문, 숫자 포함 8자 이상이어야 합니다.");
+      return;
+    }
+
+    const isGeneralEmail = email.includes("@") && email.includes(".");
+
+    if (isGeneralEmail) {
+      setErrorMessage("");
       if (keepLoggedIn) {
         localStorage.setItem("keepLoggedIn", "true");
       } else {
         localStorage.removeItem("keepLoggedIn");
       }
 
+      localStorage.setItem("userEmail", email);
+
       if (onLoginSuccess) {
         onLoginSuccess(email);
       }
-
       window.location.href = "/";
-    } else {
-      const goToSignup = window.confirm(
-        "가입되지 않은 계정이거나 비밀번호가 일치하지 않습니다.\n회원가입 페이지로 이동하시겠습니까?",
-      );
+      return;
+    }
 
-      if (goToSignup) {
-        handleSignupClick();
-      } else {
-        setErrorMessage("아이디 또는 비밀번호가 잘못되었습니다.");
-      }
+    const goToSignup = window.confirm(
+      "가입되지 않은 계정이거나 비밀번호가 일치하지 않습니다.\n회원가입 페이지로 이동하시겠습니까?",
+    );
+
+    if (goToSignup) {
+      handleSignupClick();
+    } else {
+      setErrorMessage("아이디 또는 비밀번호가 잘못되었습니다.");
     }
   };
 
