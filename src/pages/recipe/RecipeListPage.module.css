@@ -1,10 +1,78 @@
 .main{
   background-color: var(--white-2);
+  padding: 32px 0;
 }
 
+.title{
+  display: flex;
+  justify-content: center;
+  color: var(--black-2);
+  padding-bottom: 8px;
+}
+
+.totalASortArea{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.totalASortArea>h3{
+  color: var(--black-2);
+}
+
+.sortSelectLabel{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sortSelect{
+  min-width: 104px;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-1);
+  border-radius: 8px;
+  background-color: var(--white-1);
+  color: var(--black-2);
+}
+
+.errorMessage{
+  margin-bottom: 12px;
+  color: var(--danger);
+}
 
 .recipeCardArea{
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   grid-gap: 10px;
+}
+
+.loadMoreArea{
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+.loadMoreButton{
+  padding: 8px 32px;
+  background-color: var(--secondary);
+  color: var(--white-1);
+  border-radius: 999px;
+}
+
+
+/* 반응형 */ 
+
+@media (max-width:1271px) {
+  .recipeCardArea{
+    grid-template-columns: 1fr 1fr 
+  }
+}
+
+@media (max-width:767px) {
+  .recipeCardArea{
+    display: flex;
+    flex-direction: column;
+  }
 }
