@@ -82,9 +82,9 @@ const VEGAN_TYPES = [
   { id: "vegan", label: "비건", desc: "동물성 식품 완전 제외" },
 ];
 
-export default function SignupStep2({ onPrev, onComplete }) {
-  const [selectedAllergies, setSelectedAllergies] = useState([]);
-  const [selectedVegan, setSelectedVegan] = useState("none");
+export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
+  const [selectedAllergies, setSelectedAllergies] = useState(initialData.allergies || []);
+  const [selectedVegan, setSelectedVegan] = useState(initialData.veganType || "none");
 
   const toggleAllergy = item => {
     if (selectedAllergies.includes(item)) {
@@ -94,10 +94,30 @@ export default function SignupStep2({ onPrev, onComplete }) {
     }
   };
 
+  // 이전 단계로 갈 때 현재 선택한 식단/알레르기 값도 함께 전달
+  const handlePrevClick = () => {
+    if (onPrev) {
+      onPrev({
+        allergies: selectedAllergies,
+        veganType: selectedVegan,
+      });
+    }
+  };
+
+  // 가입 완료 및 데이터 전달
+  const handleCompleteClick = () => {
+    if (onComplete) {
+      onComplete({
+        allergies: selectedAllergies,
+        veganType: selectedVegan,
+      });
+    }
+  };
+
   return (
     <div className={styles.outerWrapper} translate="no" lang="ko">
       <div className={styles.cardContainer}>
-        {/* 상단 헤더 영역 (<회원가입 (2/2)> 삭제) */}
+        {/* 상단 헤더 영역 */}
         <div className={styles.headerRow}>
           <div>
             <h2 className={`text-subtitle-l`} style={{ margin: "0 0 6px 0", color: "var(--black-1)" }}>
@@ -107,7 +127,7 @@ export default function SignupStep2({ onPrev, onComplete }) {
               회원님의 알레르기 및 비건 식단 기준에 맞춰 AI가 레시피를 실시간 자동 조율해 드립니다.
             </p>
           </div>
-          <button type="button" className={`text-button-s ${styles.btnSkip}`} onClick={onComplete}>
+          <button type="button" className={`text-button-s ${styles.btnSkip}`} onClick={handleCompleteClick}>
             다음에 설정하기(건너뛰기)
           </button>
         </div>
@@ -198,14 +218,18 @@ export default function SignupStep2({ onPrev, onComplete }) {
 
         {/* 하단 버튼 그룹 */}
         <div className={styles.footerRow}>
-          <button type="button" className={`text-button-s ${styles.btnSecondary} ${styles.btnPrevPc}`} onClick={onPrev}>
+          <button
+            type="button"
+            className={`text-button-s ${styles.btnSecondary} ${styles.btnPrevPc}`}
+            onClick={handlePrevClick}
+          >
             이전단계
           </button>
           <div className={styles.footerRightBtns}>
-            <button type="button" className={`text-button-m ${styles.btnPrimary}`} onClick={onComplete}>
+            <button type="button" className={`text-button-m ${styles.btnPrimary}`} onClick={handleCompleteClick}>
               가입 완료 및 메인 페이지 이동
             </button>
-            <button type="button" className={`text-button-s ${styles.btnSecondary}`} onClick={onComplete}>
+            <button type="button" className={`text-button-s ${styles.btnSecondary}`} onClick={handleCompleteClick}>
               나중에 설정하고 둘러보기
             </button>
           </div>

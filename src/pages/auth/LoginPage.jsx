@@ -54,6 +54,7 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
         }
 
         localStorage.setItem("userEmail", userEmail);
+        localStorage.setItem("isLoggedIn", "true");
 
         if (onLoginSuccess) {
           onLoginSuccess(userEmail);
@@ -94,6 +95,7 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
         }
 
         localStorage.setItem("userEmail", email);
+        localStorage.setItem("isLoggedIn", "true");
 
         if (onLoginSuccess) {
           onLoginSuccess(email);
@@ -106,7 +108,8 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
       }
     }
 
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+    // 수정된 비밀번호 유효성 검사 (영문, 숫자가 포함되면서 특수문자나 기타 문자열도 8자 이상이면 허용)
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(password)) {
       setErrorMessage("비밀번호는 영문, 숫자 포함 8자 이상이어야 합니다.");
       return;
@@ -123,6 +126,7 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
       }
 
       localStorage.setItem("userEmail", email);
+      localStorage.setItem("isLoggedIn", "true");
 
       if (onLoginSuccess) {
         onLoginSuccess(email);
