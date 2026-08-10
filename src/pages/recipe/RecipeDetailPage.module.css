@@ -322,6 +322,7 @@
 }
 
 .danger-chip {
+  margin-top: 15px;
   margin-left: 34px;
   color: var(--danger);
 }
@@ -633,7 +634,7 @@
 .steps-card li {
   display: grid;
   grid-template-columns: 34px 1fr;
-  align-items: start;
+  align-items: center;
   min-height: 72px;
   border-bottom: 1px solid var(--gray-1);
 }
