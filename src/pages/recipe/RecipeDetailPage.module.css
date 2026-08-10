@@ -151,10 +151,10 @@
   order: 1;
   width: 100%;
   aspect-ratio: 1;
-  background:
-    linear-gradient(0deg, rgb(0 0 0 / 3%), rgb(0 0 0 / 3%)),
-    url("https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1000&q=85")
-      center / cover;
+  background-image: url("https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1000&q=85");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .recipe-summary,
@@ -322,6 +322,7 @@
 }
 
 .danger-chip {
+  margin-top: 15px;
   margin-left: 34px;
   color: var(--danger);
 }
@@ -633,7 +634,7 @@
 .steps-card li {
   display: grid;
   grid-template-columns: 34px 1fr;
-  align-items: start;
+  align-items: center;
   min-height: 72px;
   border-bottom: 1px solid var(--gray-1);
 }
@@ -765,6 +766,55 @@
 .chat-message--mine {
   align-self: flex-end;
   background: var(--white-2);
+}
+
+.chat-message--error {
+  color: var(--danger);
+}
+
+.chat-message--loading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 48px;
+  min-height: 36px;
+}
+
+.chat-message--loading span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gray-3);
+  animation: question-loading-dot 1.2s ease-in-out infinite;
+}
+
+.chat-message--loading span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.chat-message--loading span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes question-loading-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-message--loading span {
+    animation: none;
+    opacity: 0.7;
+  }
 }
 
 /* More information modal */
