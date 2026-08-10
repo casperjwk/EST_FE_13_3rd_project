@@ -33,6 +33,7 @@ const veganItems = [
 function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChange }){
   const [veganFilters, setVeganFilters] = useState(veganFilter ?? "일반");
   const [localAllergyFilters, setLocalAllergyFilters] = useState(allergyFilters ?? {});
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   
     const handleAllergyClick = item => {
@@ -83,13 +84,21 @@ const removeAllergyFilter = item => {
 
   return ( 
     <div className={styles.filterPanel}>
-      <div className={styles.sort}>
+      <button 
+      className={styles.sort}
+      onClick={() => setIsFilterOpen(prev => !prev)}
+      >
         <p>필터</p>
         <span
         className="material-icons">
           sort
           </span>
-      </div>
+      </button>
+
+    <div
+      className={`${styles.filterContent} 
+      ${isFilterOpen ? styles.open: styles.closed}`}
+    >
       <div className={styles.filterBox}>
         <section className={styles.filterSection}>
           <div className={styles.sectionTitle}>
@@ -138,6 +147,7 @@ const removeAllergyFilter = item => {
           </div>
         </section>
       </div>
+    </div>
 
       <div className={styles.selectedFilterList}>
         {selectedAllergies.length > 0 && (
