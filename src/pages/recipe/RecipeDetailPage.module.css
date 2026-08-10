@@ -7,6 +7,269 @@
   background: var(--white-2);
 }
 
+/* Recipe detail skeleton */
+.skeleton-page {
+  min-height: 100vh;
+  background: var(--white-2);
+}
+
+.skeleton-condition {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: white;
+}
+
+.skeleton-detail {
+  width: 100%;
+  padding-bottom: 40px;
+}
+
+.skeleton-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-main,
+.skeleton-side {
+  display: contents;
+}
+
+.skeleton-photo {
+  order: 1;
+}
+
+.skeleton-summary {
+  order: 2;
+}
+
+.skeleton-analysis {
+  order: 3;
+}
+
+.skeleton-ingredients {
+  order: 4;
+}
+
+.skeleton-steps {
+  order: 5;
+}
+
+.skeleton-grid {
+  gap: 16px;
+}
+
+.skeleton-block {
+  display: block;
+  background: linear-gradient(
+    100deg,
+    var(--gray-1) 20%,
+    var(--white-2) 38%,
+    var(--gray-1) 56%
+  );
+  background-size: 220% 100%;
+  animation: recipe-skeleton-loading 1.35s ease-in-out infinite;
+}
+
+.skeleton-condition__title {
+  width: 82px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.skeleton-condition__tag {
+  width: 62px;
+  height: 26px;
+  border-radius: 14px;
+}
+
+.skeleton-photo {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.skeleton-card {
+  width: calc(100% - 32px);
+  margin-right: 16px;
+  margin-left: 16px;
+  padding: 20px;
+  border-radius: 5px;
+  background: white;
+  box-shadow: 0 2px 10px rgb(38 45 32 / 10%);
+}
+
+.skeleton-line {
+  width: 100%;
+  height: 13px;
+  border-radius: 4px;
+}
+
+.skeleton-line--title {
+  width: 68%;
+  height: 24px;
+}
+
+.skeleton-line--medium {
+  width: 72%;
+}
+
+.skeleton-line--short {
+  width: 34%;
+  height: 18px;
+}
+
+.skeleton-analysis,
+.skeleton-summary,
+.skeleton-ingredients {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.skeleton-button {
+  width: 100%;
+  height: 42px;
+  border-radius: 5px;
+}
+
+.skeleton-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.skeleton-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+}
+
+.skeleton-step__number {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.skeleton-meta {
+  display: flex;
+  gap: 10px;
+}
+
+.skeleton-meta span {
+  width: 54px;
+  height: 24px;
+  border-radius: 12px;
+}
+
+.skeleton-ingredients {
+  margin-bottom: 16px;
+}
+
+@keyframes recipe-skeleton-loading {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -120% 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .skeleton-condition {
+    padding-right: 30px;
+    padding-left: 30px;
+  }
+
+  .skeleton-photo {
+    aspect-ratio: 768 / 402;
+  }
+
+  .skeleton-card {
+    width: calc(100% - 60px);
+    margin-right: 30px;
+    margin-left: 30px;
+  }
+}
+
+@media (min-width: 1272px) {
+  .skeleton-condition,
+  .skeleton-detail {
+    width: 1272px;
+    margin: 0 auto;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .skeleton-condition {
+    min-height: 60px;
+  }
+
+  .skeleton-detail {
+    padding-top: 30px;
+    padding-bottom: 70px;
+  }
+
+  .skeleton-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 848px) 412px;
+    align-items: start;
+    gap: 12px;
+  }
+
+  .skeleton-main,
+  .skeleton-side {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .skeleton-photo,
+  .skeleton-summary,
+  .skeleton-analysis,
+  .skeleton-ingredients,
+  .skeleton-steps {
+    order: initial;
+  }
+
+  .skeleton-side {
+    position: sticky;
+    top: 20px;
+  }
+
+  .skeleton-photo {
+    aspect-ratio: 848 / 646;
+  }
+
+  .skeleton-card {
+    width: 100%;
+    margin: 0;
+    padding: 24px;
+  }
+
+  .skeleton-analysis {
+    min-height: 190px;
+  }
+
+  .skeleton-summary {
+    min-height: 165px;
+  }
+
+  .skeleton-ingredients {
+    min-height: 280px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+  }
+}
+
 .recipe-page * {
   box-sizing: border-box;
 }

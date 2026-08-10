@@ -251,6 +251,58 @@ function AnalysisPanel({ analysisState, progress, onStart, onCompare, onMoreInfo
   );
 }
 
+function RecipeDetailSkeleton() {
+  return (
+    <div className={cn("recipe-page skeleton-page")} aria-busy="true" aria-live="polite">
+      <span className={cn("hidden")}>레시피를 불러오는 중입니다.</span>
+      <div className={cn("skeleton-condition")} aria-hidden="true">
+        <span className={cn("skeleton-block skeleton-condition__title")} />
+        <span className={cn("skeleton-block skeleton-condition__tag")} />
+        <span className={cn("skeleton-block skeleton-condition__tag")} />
+      </div>
+      <main className={cn("skeleton-detail")} aria-hidden="true">
+        <div className={cn("skeleton-grid")}>
+          <div className={cn("skeleton-main")}>
+            <div className={cn("skeleton-block skeleton-photo")} />
+            <section className={cn("skeleton-card skeleton-analysis")}>
+              <span className={cn("skeleton-block skeleton-line skeleton-line--medium")} />
+              <span className={cn("skeleton-block skeleton-line")} />
+              <span className={cn("skeleton-block skeleton-button")} />
+            </section>
+            <section className={cn("skeleton-card skeleton-steps")}>
+              <span className={cn("skeleton-block skeleton-line skeleton-line--short")} />
+              {[1, 2, 3, 4].map(step => (
+                <div className={cn("skeleton-step")} key={step}>
+                  <span className={cn("skeleton-block skeleton-step__number")} />
+                  <span className={cn("skeleton-block skeleton-line")} />
+                </div>
+              ))}
+            </section>
+          </div>
+          <div className={cn("skeleton-side")}>
+            <section className={cn("skeleton-card skeleton-summary")}>
+              <span className={cn("skeleton-block skeleton-line skeleton-line--title")} />
+              <span className={cn("skeleton-block skeleton-line")} />
+              <span className={cn("skeleton-block skeleton-line skeleton-line--medium")} />
+              <div className={cn("skeleton-meta")}>
+                <span className={cn("skeleton-block")} />
+                <span className={cn("skeleton-block")} />
+                <span className={cn("skeleton-block")} />
+              </div>
+            </section>
+            <section className={cn("skeleton-card skeleton-ingredients")}>
+              <span className={cn("skeleton-block skeleton-line skeleton-line--short")} />
+              {[1, 2, 3, 4, 5].map(item => (
+                <span className={cn("skeleton-block skeleton-line")} key={item} />
+              ))}
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function RecipeDetailPage() {
   const { id } = useParams();
   const [recipe, setRecipe] = useState(null);
@@ -576,7 +628,7 @@ function RecipeDetailPage() {
   };
 
   if (isRecipeLoading) {
-    return <div className={cn("recipe-page p-4 text-s")}>레시피를 불러오는 중입니다.</div>;
+    return <RecipeDetailSkeleton />;
   }
 
   if (recipeError) {
