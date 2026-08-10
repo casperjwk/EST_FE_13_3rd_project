@@ -151,10 +151,10 @@
   order: 1;
   width: 100%;
   aspect-ratio: 1;
-  background:
-    linear-gradient(0deg, rgb(0 0 0 / 3%), rgb(0 0 0 / 3%)),
-    url("https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1000&q=85")
-      center / cover;
+  background-image: url("https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1000&q=85");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .recipe-summary,
