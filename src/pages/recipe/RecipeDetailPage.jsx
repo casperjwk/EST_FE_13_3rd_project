@@ -273,6 +273,9 @@ function RecipeDetailPage() {
   const [veganOptions, setVeganOptions] = useState([]);
   const [conditionOptionsError, setConditionOptionsError] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
+  const [recipeQuestion, setRecipeQuestion] = useState("");
+  const [questionMessages, setQuestionMessages] = useState([]);
+  const [isQuestionLoading, setIsQuestionLoading] = useState(false);
   const isComplete = analysisState === "complete";
   const ingredients = (recipe?.recipe_ingredients ?? [])
     .slice()
@@ -357,6 +360,8 @@ function RecipeDetailPage() {
         setRecipe(data);
         setAnalysisState("before");
         setSimpleRecipeStep(0);
+        setRecipeQuestion("");
+        setQuestionMessages([]);
       }
       setIsRecipeLoading(false);
     }
@@ -487,6 +492,70 @@ function RecipeDetailPage() {
     setIsConditionModalOpen(false);
   };
 
+  const askRecipeQuestion = async event => {
+    event.preventDefault();
+    const question = recipeQuestion.trim();
+
+    if (!question || isQuestionLoading) return;
+
+    const previousConversation = questionMessages
+      .filter(message => message.status !== "error")
+      .map(({ role, content }) => ({ role, content }));
+    setQuestionMessages(current => [...current, { role: "user", content: question }]);
+    setRecipeQuestion("");
+    setIsQuestionLoading(true);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      setQuestionMessages(current => [
+        ...current,
+        {
+          role: "assistant",
+          content: "로그인 후 AI 질문 기능을 이용해 주세요.",
+          status: "error",
+        },
+      ]);
+      setIsQuestionLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke("answer-recipe-question", {
+      body: {
+        recipeId: recipe.id,
+        question,
+        conversation: previousConversation,
+      },
+    });
+
+    if (error) {
+      console.error("[HankkiLab] Recipe question error:", error);
+      setQuestionMessages(current => [
+        ...current,
+        {
+          role: "assistant",
+          content: "답변을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.",
+          status: "error",
+        },
+      ]);
+    } else if (!data?.answer) {
+      setQuestionMessages(current => [
+        ...current,
+        {
+          role: "assistant",
+          content: "AI가 답변을 생성하지 못했어요. 질문을 바꿔 다시 시도해 주세요.",
+          status: "error",
+        },
+      ]);
+    } else {
+      setQuestionMessages(current => [...current, { role: "assistant", content: data.answer }]);
+    }
+
+    setIsQuestionLoading(false);
+  };
+
   if (isRecipeLoading) {
     return <div className={cn("recipe-page p-4 text-s")}>레시피를 불러오는 중입니다.</div>;
   }
@@ -585,12 +654,17 @@ function RecipeDetailPage() {
               </p>
               <div className={cn("question-chips")}>
                 {suggestedQuestions.map(question => (
-                  <button className="text-xs" type="button" key={question}>
+                  <button
+                    className="text-xs"
+                    type="button"
+                    key={question}
+                    onClick={() => setRecipeQuestion(question)}
+                  >
                     {question}
                   </button>
                 ))}
               </div>
-              <form className={cn("question-form")}>
+              <form className={cn("question-form")} onSubmit={askRecipeQuestion}>
                 <label className={cn("hidden")} htmlFor="recipe-question">
                   레시피 질문
                 </label>
@@ -598,20 +672,45 @@ function RecipeDetailPage() {
                   className="text-xs"
                   id="recipe-question"
                   placeholder="예 : 돼지고기 대신 사용할 수 있는 재료가 있나요?"
+                  value={recipeQuestion}
+                  maxLength={300}
+                  disabled={isQuestionLoading}
+                  onChange={event => setRecipeQuestion(event.target.value)}
                 />
-                <button type="submit" aria-label="질문 보내기">
+                <button
+                  type="submit"
+                  aria-label="질문 보내기"
+                  disabled={!recipeQuestion.trim() || isQuestionLoading}
+                >
                   <Icon name="send" size={21} />
                 </button>
               </form>
-              <div className={cn("chat-messages")}>
-                <p className={cn("chat-message chat-message--mine text-xs")}>
-                  콩비지 대신 두부를 사용해도 될까요?
-                </p>
-                <p className={cn("chat-message text-xs")}>
-                  네, 으깬 두부를 사용해도 좋아요. 물의 양을 조금 줄이면 비슷한 농도로 만들 수
-                  있어요.
-                </p>
-              </div>
+              {(questionMessages.length > 0 || isQuestionLoading) && (
+                <div className={cn("chat-messages")} aria-live="polite">
+                  {questionMessages.map((message, index) => (
+                    <p
+                      className={cn(
+                        "chat-message text-xs",
+                        message.role === "user" ? "chat-message--mine" : "",
+                        message.status === "error" ? "chat-message--error" : "",
+                      )}
+                      key={`${message.role}-${index}-${message.content}`}
+                    >
+                      {message.content}
+                    </p>
+                  ))}
+                  {isQuestionLoading && (
+                    <div
+                      className={cn("chat-message chat-message--loading")}
+                      aria-label="AI가 답변을 작성하고 있어요"
+                    >
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           </div>
 

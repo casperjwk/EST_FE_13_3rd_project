@@ -767,6 +767,55 @@
   background: var(--white-2);
 }
 
+.chat-message--error {
+  color: var(--danger);
+}
+
+.chat-message--loading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 48px;
+  min-height: 36px;
+}
+
+.chat-message--loading span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gray-3);
+  animation: question-loading-dot 1.2s ease-in-out infinite;
+}
+
+.chat-message--loading span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.chat-message--loading span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes question-loading-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-message--loading span {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
 /* More information modal */
 .more-info-backdrop {
   position: fixed;
