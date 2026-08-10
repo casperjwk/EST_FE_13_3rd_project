@@ -10,7 +10,9 @@ export default function SignupPage() {
   const [signupData, setSignupData] = useState({
     email: "",
     password: "",
+    passwordConfirm: "",
     nickname: "",
+    agree: false,
     allergies: [],
     veganType: "none",
   });
@@ -25,8 +27,12 @@ export default function SignupPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Step 2 ➔ Step 1 이동
-  const handlePrevStep = () => {
+  // Step 2 ➔ Step 1 이동 (입력한 데이터 유지용으로 현재 값도 같이 보존)
+  const handlePrevStep = (step2Data = {}) => {
+    setSignupData(prev => ({
+      ...prev,
+      ...step2Data,
+    }));
     setStep(1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -109,9 +115,9 @@ export default function SignupPage() {
   return (
     <>
       {step === 1 ? (
-        <SignupStep1 onNext={handleNextStep} onGoToLogin={handleGoToLogin} />
+        <SignupStep1 onNext={handleNextStep} onGoToLogin={handleGoToLogin} initialData={signupData} />
       ) : (
-        <SignupStep2 onPrev={handlePrevStep} onComplete={handleCompleteSignup} />
+        <SignupStep2 onPrev={handlePrevStep} onComplete={handleCompleteSignup} initialData={signupData} />
       )}
     </>
   );

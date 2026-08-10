@@ -17,3 +17,6 @@ port = 54323
 
 [functions.generate-custom-recipe]
 verify_jwt = true
+
+[functions.answer-recipe-question]
+verify_jwt = true

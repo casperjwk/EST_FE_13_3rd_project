@@ -1,5 +1,6 @@
 import "./App.css";
 import { Routes, Route } from "react-router";
+import { AuthProvider } from "./context/AuthContext";
 
 import MainLayout from "./components/common/MainLayout";
 import HomePage from "./pages/home/HomePage";
@@ -18,21 +19,25 @@ import RecipeCreatePage from "./pages/admin/RecipeCreatePage";
 
 function App() {
   return (
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/recipes" element={<RecipeListPage />} />
-        <Route path="/recipes/:id" element={<RecipeDetailPage />} />
-        <Route path="/mypage" element={<MyPage />} />
-        <Route path="/favorite" element={<FavoritePage />} />
-      </Route>
+    <AuthProvider>
+      {" "}
+      {/* 2. 전체 라우트를 감싸기 */}
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/recipes" element={<RecipeListPage />} />
+          <Route path="/recipes/:id" element={<RecipeDetailPage />} />
+          <Route path="/mypage" element={<MyPage />} />
+          <Route path="/favorite" element={<FavoritePage />} />
+        </Route>
 
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/admin" element={<AdminPage />} />
-      <Route path="/create" element={<RecipeCreatePage />} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/create" element={<RecipeCreatePage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </AuthProvider>
   );
 }
 

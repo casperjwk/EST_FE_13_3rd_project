@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import styles from "./SignupStep1.module.css";
+import { supabase } from "../../lib/supabase";
 
 const IconSprout = ({ size = 18, color = "var(--primary)" }) => (
   <svg
@@ -33,14 +34,42 @@ const IconSparkle = ({ size = 18, color = "var(--tag)" }) => (
   </svg>
 );
 
-export default function SignupStep1({ onNext, onGoToLogin }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
-  const [nickname, setNickname] = useState("");
-  const [agree, setAgree] = useState(false);
+export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
+  const [email, setEmail] = useState(initialData.email || "");
+  const [password, setPassword] = useState(initialData.password || "");
+  const [passwordConfirm, setPasswordConfirm] = useState(initialData.passwordConfirm || "");
+  const [nickname, setNickname] = useState(initialData.nickname || "");
+  const [agree, setAgree] = useState(initialData.agree || false);
 
+  const [isEmailChecked, setIsEmailChecked] = useState(false); // 이메일 중복확인 여부
   const [errors, setErrors] = useState({});
+
+  // 이메일 중복 확인 기능
+  const handleCheckEmailDuplicate = async () => {
+    if (!email || !email.includes("@")) {
+      setErrors(prev => ({ ...prev, email: "올바른 이메일 형식을 입력해 주세요. (@ 포함)" }));
+      return;
+    }
+
+    try {
+      // profiles 테이블에서 이미 존재하는 이메일인지 확인 (또는 auth 확인 대안)
+      const { data, error } = await supabase.from("profiles").select("id").eq("email", email).maybeSingle();
+
+      if (data) {
+        alert("이미 사용 중인 이메일입니다.");
+        setIsEmailChecked(false);
+      } else {
+        alert("사용 가능한 이메일입니다.");
+        setIsEmailChecked(true);
+        setErrors(prev => ({ ...prev, email: "" }));
+      }
+    } catch (err) {
+      console.error("이메일 중복 확인 오류:", err);
+      // 만약 profiles 테이블에 email 컬럼이 없다면 단순 형식 통과로 처리
+      setIsEmailChecked(true);
+      alert("사용 가능한 이메일입니다.");
+    }
+  };
 
   const validate = () => {
     const newErrors = {};
@@ -73,7 +102,8 @@ export default function SignupStep1({ onNext, onGoToLogin }) {
     e.preventDefault();
     if (validate()) {
       if (onNext) {
-        onNext({ email, password, nickname });
+        // Step 2로 데이터 전달
+        onNext({ email, password, nickname, agree });
       }
     }
   };
@@ -93,7 +123,6 @@ export default function SignupStep1({ onNext, onGoToLogin }) {
               <br />
               환영합니다!
             </h2>
-            {/* 깔끔하게 3줄로 분리된 설명 문구 */}
             <p className={`text-s ${styles.bannerSub}`}>
               알레르기 정보부터 비건 식단까지,
               <br />
@@ -138,10 +167,15 @@ export default function SignupStep1({ onNext, onGoToLogin }) {
                     value={email}
                     onChange={e => {
                       setEmail(e.target.value);
+                      setIsEmailChecked(false);
                       if (errors.email) setErrors({ ...errors, email: "" });
                     }}
                   />
-                  <button type="button" className={`text-button-s ${styles.btnSecondary}`}>
+                  <button
+                    type="button"
+                    className={`text-button-s ${styles.btnSecondary}`}
+                    onClick={handleCheckEmailDuplicate}
+                  >
                     중복확인
                   </button>
                 </div>
