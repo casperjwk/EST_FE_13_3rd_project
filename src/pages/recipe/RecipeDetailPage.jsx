@@ -3,6 +3,7 @@ import { useParams } from "react-router";
 import Badge from "../../components/common/Badge";
 import { supabase } from "../../lib/supabase";
 import styles from "./RecipeDetailPage.module.css";
+import { recordRecipeView } from "../../services/recentViewService";
 
 function cn(...classNames) {
   return classNames
@@ -242,11 +243,7 @@ function AnalysisPanel({ analysisState, progress, onStart, onCompare, onMoreInfo
           <Icon name="shield" size={15} />
           AI 맞춤 레시피 만들기
         </button>
-        <button
-          className={cn("secondary-button text-button-s")}
-          type="button"
-          onClick={onMoreInfo}
-        >
+        <button className={cn("secondary-button text-button-s")} type="button" onClick={onMoreInfo}>
           <Icon name="info" size={14} />더 알아보기
         </button>
       </div>
@@ -313,6 +310,25 @@ function RecipeDetailPage() {
   useEffect(() => {
     let isActive = true;
 
+    async function recordLoadedRecipeView(recipeId) {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error("[HankkiLab] Session check error:", sessionError);
+        return;
+      }
+      if (!session?.user) return;
+
+      try {
+        await recordRecipeView(session.user.id, recipeId);
+      } catch (error) {
+        console.error("[HankkiLab] Recent recipe view error:", error);
+      }
+    }
+
     async function loadRecipe() {
       if (!id) {
         setRecipeError("레시피 ID가 없습니다.");
@@ -324,7 +340,8 @@ function RecipeDetailPage() {
       setRecipeError("");
       const { data, error } = await supabase
         .from("recipes")
-        .select(`
+        .select(
+          `
           id,
           title,
           description,
@@ -346,7 +363,8 @@ function RecipeDetailPage() {
             description,
             step_type
           )
-        `)
+        `,
+        )
         .eq("id", id)
         .maybeSingle();
 
@@ -362,6 +380,7 @@ function RecipeDetailPage() {
         setSimpleRecipeStep(0);
         setRecipeQuestion("");
         setQuestionMessages([]);
+        void recordLoadedRecipeView(data.id);
       }
       setIsRecipeLoading(false);
     }
@@ -564,11 +583,12 @@ function RecipeDetailPage() {
     return <div className={cn("recipe-page p-4 text-s")}>{recipeError}</div>;
   }
 
-  const difficultyLabel = {
-    easy: "쉬움",
-    normal: "보통",
-    hard: "어려움",
-  }[recipe.difficulty] ?? recipe.difficulty;
+  const difficultyLabel =
+    {
+      easy: "쉬움",
+      normal: "보통",
+      hard: "어려움",
+    }[recipe.difficulty] ?? recipe.difficulty;
   const difficultyColorClass = {
     easy: "safe-badge--easy",
     normal: "safe-badge--normal",
@@ -589,7 +609,9 @@ function RecipeDetailPage() {
               className={cn("recipe-photo")}
               role="img"
               aria-label={`${recipe.title} 완성 사진`}
-              style={recipe.image_url ? { backgroundImage: `url("${recipe.image_url}")` } : undefined}
+              style={
+                recipe.image_url ? { backgroundImage: `url("${recipe.image_url}")` } : undefined
+              }
             />
 
             <AnalysisPanel
@@ -614,7 +636,11 @@ function RecipeDetailPage() {
             <section className={cn("steps-card p-3 p-xl-4")}>
               <div className={cn("section-heading mb-3")}>
                 <h2>조리 순서</h2>
-                <button className={cn("simple-recipe-button")} type="button" onClick={openSimpleRecipe}>
+                <button
+                  className={cn("simple-recipe-button")}
+                  type="button"
+                  onClick={openSimpleRecipe}
+                >
                   간단 레시피 보기
                 </button>
               </div>
@@ -921,7 +947,9 @@ function RecipeDetailPage() {
                 <div className={cn("condition-option-section__title")}>
                   <div>
                     <h3>알레르기 정보</h3>
-                    <p>해당하는 알레르기를 모두 선택해주세요. 레시피 검색 시 자동으로 적용됩니다.</p>
+                    <p>
+                      해당하는 알레르기를 모두 선택해주세요. 레시피 검색 시 자동으로 적용됩니다.
+                    </p>
                   </div>
                   <span>중복 선택 가능</span>
                 </div>
@@ -952,7 +980,9 @@ function RecipeDetailPage() {
                 <div className={cn("condition-option-section__title")}>
                   <div>
                     <h3>비건 유형</h3>
-                    <p>비건 유형은 알레르기와 별개 기준입니다. 가장 가까운 식단 유형을 선택하세요.</p>
+                    <p>
+                      비건 유형은 알레르기와 별개 기준입니다. 가장 가까운 식단 유형을 선택하세요.
+                    </p>
                   </div>
                   <span>단일 선택</span>
                 </div>
