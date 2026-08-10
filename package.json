@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "supabase:start": "npx supabase start",
+    "supabase:serve": "npx supabase functions serve generate-custom-recipe --env-file supabase/functions/.env.local"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.3.1",

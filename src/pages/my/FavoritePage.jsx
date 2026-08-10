@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import "material-icons/iconfont/filled.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "../../styles/global.css";
 import styles from "./FavoritePage.module.css";
+import { getFavoriteRecipes } from "../../services/favoriteService";
 
-// 즐겨찾기 있는 버전 목업 데이터 - 나중에 Supabase 연동 시 실제 값으로 교체
+// 로그인 기능 연동 전까지 임시로 쓰는 테스트 유저 id - 로그인 연동되면 실제 로그인 유저 id로 교체
+const TEST_USER_ID = "980102d8-2d68-4ac3-b840-c09a78806907";
+
+// 식단 조건 요약 카드 - 알레르기 비교 로직 붙기 전까지 목업 유지
 const favoriteSummary = {
   userName: "홍길동",
-  totalCount: 5,
   safeCount: 5,
   replaceableCount: 0,
   warningCount: 0,
@@ -19,64 +23,16 @@ const favoriteSummary = {
   ],
 };
 
-// 즐겨찾기 레시피 카드 목업 데이터 - 나중에 실제 즐겨찾기 목록으로 교체
-const favoriteRecipes = [
-  {
-    id: 1,
-    name: "음식 이름",
-    description: "음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명",
-    difficulty: "쉬움",
-    time: 15,
-    servings: 1,
-    likes: 24,
-    status: "safe",
-  },
-  {
-    id: 2,
-    name: "음식 이름",
-    description: "음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명",
-    difficulty: "보통",
-    time: 15,
-    servings: 1,
-    likes: 24,
-    status: "replaceable",
-  },
-  {
-    id: 3,
-    name: "음식 이름",
-    description: "음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명",
-    difficulty: "어려움",
-    time: 15,
-    servings: 1,
-    likes: 24,
-    status: "warning",
-  },
-  {
-    id: 4,
-    name: "음식 이름",
-    description: "음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명",
-    difficulty: "쉬움",
-    time: 15,
-    servings: 1,
-    likes: 24,
-    status: "replaced",
-  },
-  {
-    id: 5,
-    name: "음식 이름",
-    description: "음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명음식설명",
-    difficulty: "보통",
-    time: 15,
-    servings: 1,
-    likes: 24,
-    status: "safe",
-  },
-];
-
 const difficultyStyles = {
-  쉬움: "cardDifficultyEasy",
-  보통: "cardDifficultyNormal",
-  어려움: "cardDifficultyHard",
+  easy: "cardDifficultyEasy",
+  normal: "cardDifficultyNormal",
+  hard: "cardDifficultyHard",
+};
+
+const difficultyLabels = {
+  easy: "쉬움",
+  normal: "보통",
+  hard: "어려움",
 };
 
 const statusConfig = {
@@ -111,9 +67,45 @@ const statusConfig = {
 };
 
 function FavoritePage() {
+  const navigate = useNavigate();
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
+  const [favoriteRecipes, setFavoriteRecipes] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const toggleFavorite = id => {
+  useEffect(() => {
+    async function loadFavoriteRecipes() {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+
+        const recipes = await getFavoriteRecipes(TEST_USER_ID);
+        setFavoriteRecipes(
+          recipes.map(recipe => ({
+            id: recipe.id,
+            name: recipe.title,
+            description: recipe.description,
+            imageUrl: recipe.image_url,
+            difficulty: recipe.difficulty,
+            time: recipe.cooking_time,
+            servings: recipe.servings,
+            likes: "22",
+            status: "safe",
+          })),
+        );
+      } catch (error) {
+        console.error("[HankkiLab] 즐겨찾기 레시피 조회 실패", error);
+        setErrorMessage("즐겨찾기한 레시피를 불러오지 못했습니다.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadFavoriteRecipes();
+  }, []);
+
+  const toggleFavorite = (id, event) => {
+    event.stopPropagation();
     setFavoriteIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -125,16 +117,55 @@ function FavoritePage() {
     });
   };
 
+  const goToRecipeDetail = id => {
+    navigate(`/recipes/${id}`);
+  };
+
+  const goToRecipeList = () => {
+    navigate("/recipes");
+  };
+
+  const hasFavorites = !isLoading && !errorMessage && favoriteRecipes.length > 0;
+  const showEmptyState = !isLoading && !errorMessage && favoriteRecipes.length === 0;
+
   return (
     <div className={styles.favoritePage}>
       <div className={`container ${styles.favoritePageInner}`}>
         <h2 className={styles.title}>
           즐겨찾기
-          <span className={styles.countBadge}>{favoriteSummary.totalCount}개</span>
+          <span className={styles.countBadge}>{favoriteRecipes.length}개</span>
         </h2>
-        <p className={styles.subtitle}>저장한 레시피를 내 식단 조건에 맞게 확인했어요.</p>
+        <p className={styles.subtitle}>
+          {showEmptyState ? (
+            <>
+              마음에 드는 레시피를 즐겨찾기에 추가하면{" "}
+              <br className={styles.subtitleBreak} />
+              식단 조건에 맞는지 바로 확인해드려요.
+            </>
+          ) : (
+            "저장한 레시피를 내 식단 조건에 맞게 확인했어요."
+          )}
+        </p>
 
-        <section className={styles.summaryCard}>
+        {isLoading && <p className={styles.subtitle}>불러오는 중...</p>}
+        {!isLoading && errorMessage && <p className={styles.subtitle}>{errorMessage}</p>}
+
+        {showEmptyState && (
+          <div className={styles.emptyState}>
+            <span className={`material-icons ${styles.emptyIcon}`} aria-hidden="true">
+              favorite_border
+            </span>
+            <p className={styles.emptyTitle}>아직 즐겨찾기한 레시피가 없어요</p>
+            <p className={styles.emptyDesc}>마음에 드는 레시피를 즐겨찾기에 추가해보세요!</p>
+            <button type="button" className={styles.emptyButton} onClick={goToRecipeList}>
+              레시피 둘러보기
+            </button>
+          </div>
+        )}
+
+        {hasFavorites && (
+          <>
+          <section className={styles.summaryCard}>
           <div className={styles.summaryTop}>
             <div className={styles.summaryHeader}>
               <p className={styles.summaryTitle}>
@@ -146,7 +177,7 @@ function FavoritePage() {
                   horizontal_rule
                 </span>
                 <span className={styles.summaryTitleMuted}>
-                  {favoriteSummary.userName}님의 즐겨찾기 {favoriteSummary.totalCount}개 기준
+                  {favoriteSummary.userName}님의 즐겨찾기 {favoriteRecipes.length}개 기준
                 </span>
               </p>
               <span className={styles.summaryStatusBadge}>
@@ -212,13 +243,17 @@ function FavoritePage() {
           {favoriteRecipes.map(recipe => {
             const isFavorite = favoriteIds.has(recipe.id);
             return (
-              <div key={recipe.id} className={styles.cardItem}>
+              <div
+                key={recipe.id}
+                className={styles.cardItem}
+                onClick={() => goToRecipeDetail(recipe.id)}
+              >
                 <div className={styles.cardImageWrap}>
-                  <img src="" alt={recipe.name} className={styles.cardImage} />
+                  <img src={recipe.imageUrl} alt={recipe.name} className={styles.cardImage} />
                   <span
                     className={`${styles.cardDifficulty} ${styles[difficultyStyles[recipe.difficulty]]}`}
                   >
-                    {recipe.difficulty}
+                    {difficultyLabels[recipe.difficulty]}
                   </span>
                   <button
                     type="button"
@@ -226,7 +261,7 @@ function FavoritePage() {
                       isFavorite ? styles.cardFavoriteBtnActive : ""
                     }`}
                     aria-label="즐겨찾기"
-                    onClick={() => toggleFavorite(recipe.id)}
+                    onClick={event => toggleFavorite(recipe.id, event)}
                   >
                     <i className={isFavorite ? "fa-solid fa-heart" : "fa-regular fa-heart"} />
                   </button>
@@ -289,6 +324,8 @@ function FavoritePage() {
             );
           })}
         </div>
+          </>
+        )}
       </div>
     </div>
   );

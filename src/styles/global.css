@@ -2,6 +2,9 @@
 @import url("reset.css");
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 :root {
   /* Color styles */
   --primary: rgba(106, 143, 91, 1);

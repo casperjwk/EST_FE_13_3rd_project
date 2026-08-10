@@ -25,64 +25,70 @@ const veganItems = [
   "폴로",
   "페스코",
   "락토-오보",
-  "릭토",
+  "락토",
   "오보",
   "비건",
 ];
 
-function FilterPanel(){
-  const [allergyFilters, setAllergyFilters] = useState({});
-  const [veganFilters, setVeganFilters] = useState("일반");
+function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChange }){
+  const [veganFilters, setVeganFilters] = useState(veganFilter ?? "일반");
+  const [localAllergyFilters, setLocalAllergyFilters] = useState(allergyFilters ?? {});
 
-  const handleAllergyClick = (item) => {
-    setAllergyFilters((prev)=>{
+  
+    const handleAllergyClick = item => {
+    setLocalAllergyFilters(prev => {
       const current = prev[item] || "none";
-      
-      let next = "none";
 
-      if (current === "none") {
-        next = "warning";
-      }else if ( current ==="warning"){
-        next = "exclude"
-      }else {
-        next = "none";
-      }
-      return{
+      let next = "none";
+      if (current === "none") next = "warning";
+      else if (current === "warning") next = "exclude";
+
+      const nextFilters = {
         ...prev,
         [item]: next,
       };
+
+      onAllergyChange?.(nextFilters);
+      return nextFilters;
     });
   };
+
 
   const handleVeganClick = (item) => {
     setVeganFilters(item);
+    onVeganChange?.(item);
   }
 
-  const resetAllFilters = () => {
-    setAllergyFilters({});
-    setVeganFilters("일반");
-  };
+const resetAllFilters = () => {
+  setLocalAllergyFilters({});
+  onAllergyChange?.({});
 
-  const removeAllergyFilter = (item) => {
-    setAllergyFilters((prev) => {
-      const next = { ...prev };
-      delete next[item];
-      return next;
-    });
-  };
+  setVeganFilters("일반");
+  onVeganChange?.("일반");
+};
 
-  const selectedAllergies = Object.entries(allergyFilters).filter(
+const removeAllergyFilter = item => {
+  setLocalAllergyFilters(prev => {
+    const next = { ...prev };
+    delete next[item];
+
+    onAllergyChange?.(next);
+    return next;
+  });
+};
+
+  const selectedAllergies = Object.entries(localAllergyFilters).filter(
     ([,state]) => state !=="none"
   );
 
   return ( 
     <div className={styles.filterPanel}>
       <div className={styles.sort}>
+        <p>필터</p>
         <span
         className="material-icons">
           sort
           </span>
-          <p>필터</p>
       </div>
       <div className={styles.filterBox}>
         <section className={styles.filterSection}>
@@ -92,7 +98,7 @@ function FilterPanel(){
           </div>
           <div className={styles.chipList}>
             {allergyItems.map((item)=>{
-              const state = allergyFilters[item] || "none";
+              const state = localAllergyFilters[item] || "none";
 
               return (
                 <button
