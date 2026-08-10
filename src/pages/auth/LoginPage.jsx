@@ -83,41 +83,19 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
       return;
     }
 
-    const isAdminAccount = email === "test@han77ilab.com" || email.includes("admin");
+    try {
+      // 관리자든 일반 유저든 실제 Supabase 백엔드 인증을 공통으로 수행
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
 
-    if (isAdminAccount) {
-      if (password === "Test1234!!") {
-        setErrorMessage("");
-        if (keepLoggedIn) {
-          localStorage.setItem("keepLoggedIn", "true");
-        } else {
-          localStorage.removeItem("keepLoggedIn");
-        }
-
-        localStorage.setItem("userEmail", email);
-        localStorage.setItem("isLoggedIn", "true");
-
-        if (onLoginSuccess) {
-          onLoginSuccess(email);
-        }
-        window.location.href = "/";
-        return;
-      } else {
-        setErrorMessage("관리자 비밀번호가 일치하지 않습니다.");
+      if (error) {
+        console.error("로그인 실패:", error.message);
+        setErrorMessage("아이디 또는 비밀번호가 잘못되었습니다.");
         return;
       }
-    }
 
-    // 수정된 비밀번호 유효성 검사 (영문, 숫자가 포함되면서 특수문자나 기타 문자열도 8자 이상이면 허용)
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(password)) {
-      setErrorMessage("비밀번호는 영문, 숫자 포함 8자 이상이어야 합니다.");
-      return;
-    }
-
-    const isGeneralEmail = email.includes("@") && email.includes(".");
-
-    if (isGeneralEmail) {
       setErrorMessage("");
       if (keepLoggedIn) {
         localStorage.setItem("keepLoggedIn", "true");
@@ -125,24 +103,17 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
         localStorage.removeItem("keepLoggedIn");
       }
 
-      localStorage.setItem("userEmail", email);
+      const loggedInEmail = data.user?.email || email;
+      localStorage.setItem("userEmail", loggedInEmail);
       localStorage.setItem("isLoggedIn", "true");
 
       if (onLoginSuccess) {
-        onLoginSuccess(email);
+        onLoginSuccess(loggedInEmail);
       }
       window.location.href = "/";
-      return;
-    }
-
-    const goToSignup = window.confirm(
-      "가입되지 않은 계정이거나 비밀번호가 일치하지 않습니다.\n회원가입 페이지로 이동하시겠습니까?",
-    );
-
-    if (goToSignup) {
-      handleSignupClick();
-    } else {
-      setErrorMessage("아이디 또는 비밀번호가 잘못되었습니다.");
+    } catch (err) {
+      console.error("로그인 예외 발생:", err);
+      setErrorMessage("로그인 중 오류가 발생했습니다.");
     }
   };
 
