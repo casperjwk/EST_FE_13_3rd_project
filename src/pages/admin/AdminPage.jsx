@@ -84,15 +84,20 @@ const AdminPage = () => {
       try {
         let userEmail = "";
 
+        // 1. Supabase 세션 우선 확인
         const {
           data: { session },
         } = await supabase.auth.getSession();
-
         if (session && session.user) {
           userEmail = session.user.email;
-        } else {
+        }
+
+        // 2. 세션에 없다면 로컬 스토리지 확인
+        if (!userEmail) {
           userEmail = localStorage.getItem("userEmail") || "";
         }
+
+        console.log("현재 로그인된 사용자 이메일:", userEmail); // 디버깅용 콘솔
 
         if (!userEmail) {
           alert("로그인이 필요한 페이지입니다.");
@@ -100,11 +105,9 @@ const AdminPage = () => {
           return;
         }
 
-        // 관계자(관리자) 화이트리스트 검증 로직 강화
-        // 일반 유저가 'admin'이라는 단어가 포함된 이메일로 우회 진입하는 것을 방지하기 위해
-        // 정확히 지정된 관리자 전용 이메일 계정들만 허용하도록 설정합니다.
+        // 관리자 화이트리스트 검증
         const allowedAdminEmails = ["test@han77ilab.com", "admin@han77ilab.com"];
-        const isOfficialAdmin = allowedAdminEmails.includes(userEmail);
+        const isOfficialAdmin = allowedAdminEmails.includes(userEmail.trim());
 
         if (isOfficialAdmin) {
           setIsAuthorized(true);
