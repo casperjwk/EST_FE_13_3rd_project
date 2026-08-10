@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { useAuth } from '../../context/AuthContext';
 import logoImg from '../../assets/logo.svg';
 import styles from './common.module.css';
 
 function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const isLoggedIn = false; // TODO: AuthContext 만들어지면 교체
+  const { user, signOut } = useAuth();
+  const isLoggedIn = !!user;
 
   const closeMenu = () => setMenuOpen(false);
+
+  const handleLogout = () => {
+    signOut();
+    closeMenu();
+  };
 
   return (
     <header className={styles['common-header']}>
@@ -48,7 +55,7 @@ function Header() {
             <>
               <div className={styles['common-header__mobile-profile']}>
                 <div className={styles['common-header__profile-circle']}></div>
-                <span className="text-s">사용자</span>
+                <span className="text-s">{user.email}</span>
               </div>
               <Link to="/" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>홈</Link>
               <Link to="/recipes" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>레시피</Link>
@@ -56,7 +63,7 @@ function Header() {
               <Link to="/favorite" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>즐겨찾기</Link>
               <button
                 className={`${styles['common-header__logout-btn']} text-s`}
-                onClick={closeMenu}
+                onClick={handleLogout}
               >
                 로그아웃
               </button>
