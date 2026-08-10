@@ -90,6 +90,19 @@
   text-decoration: none;
 }
 
+.common-header__profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--black-1);
+}
+
+.common-header__profile-arrow {
+  font-size: 18px;
+  color: var(--gray-3);
+}
+
 .common-header__profile-circle {
   width: 32px;
   height: 32px;
@@ -186,7 +199,6 @@
     display: block;
   }
 }
-
 /* Footer css */
 .common-footer {
   width: 100%;
