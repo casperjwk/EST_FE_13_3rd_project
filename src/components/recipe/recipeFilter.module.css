@@ -61,6 +61,31 @@
   color: var(--primary);
 }
 
+.filterContent{
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  overflow: hidden;
+  transition: 0.9s ease;
+}
+
+.filterContent > * {
+  min-height: 0;
+}
+.filterContent .filterBox{
+  overflow: hidden;
+}
+
+.filterContent.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.filterContent.closed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
 .selectedFilterList {
   display: flex;
   flex-wrap: wrap;
