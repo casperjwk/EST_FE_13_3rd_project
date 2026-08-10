@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import "material-icons/iconfont/filled.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "../../styles/global.css";
 import { supabase } from "../../lib/supabase";
+import { getRecentlyViewedRecipes } from "../../services/recentViewService";
 import styles from "./MyPage.module.css";
+
+// 로그인 기능 연동 전까지 임시로 쓰는 테스트 유저 id - 로그인 연동되면 실제 로그인 유저 id로 교체
+const TEST_USER_ID = "980102d8-2d68-4ac3-b840-c09a78806907";
 
 const user = {
   name: "홍길동",
@@ -47,30 +51,26 @@ const veganTypes = [
   },
 ];
 
-// 최근 본 레시피 목업 데이터 - 나중에 실제 조회 기록으로 교체
-const recentRecipes = [
-  { id: 1, name: "음식 이름", difficulty: "쉬움", time: 15, servings: 1, likes: 24 },
-  { id: 2, name: "음식 이름", difficulty: "보통", time: 15, servings: 1, likes: 24 },
-  { id: 3, name: "음식 이름", difficulty: "어려움", time: 15, servings: 1, likes: 24 },
-  { id: 4, name: "음식 이름", difficulty: "쉬움", time: 15, servings: 1, likes: 24 },
-  { id: 5, name: "음식 이름", difficulty: "보통", time: 15, servings: 1, likes: 24 },
-  { id: 6, name: "음식 이름", difficulty: "어려움", time: 15, servings: 1, likes: 24 },
-  { id: 7, name: "음식 이름", difficulty: "쉬움", time: 15, servings: 1, likes: 24 },
-  { id: 8, name: "음식 이름", difficulty: "보통", time: 15, servings: 1, likes: 24 },
-];
-
 const difficultyStyles = {
-  쉬움: "recentDifficultyEasy",
-  보통: "recentDifficultyNormal",
-  어려움: "recentDifficultyHard",
+  easy: "recentDifficultyEasy",
+  normal: "recentDifficultyNormal",
+  hard: "recentDifficultyHard",
+};
+
+const difficultyLabels = {
+  easy: "쉬움",
+  normal: "보통",
+  hard: "어려움",
 };
 
 function MyPage() {
+  const navigate = useNavigate();
   const [photoUrl, setPhotoUrl] = useState(null);
   const [allergyOptions, setAllergyOptions] = useState([]);
   const [selectedAllergies, setSelectedAllergies] = useState(dietDraft.allergies);
   const [selectedVeganType, setSelectedVeganType] = useState(dietDraft.veganType);
   const [favoriteRecentIds, setFavoriteRecentIds] = useState(() => new Set());
+  const [recentRecipes, setRecentRecipes] = useState([]);
 
   useEffect(() => {
     let isActive = true;
@@ -91,7 +91,35 @@ function MyPage() {
     };
   }, []);
 
-  const toggleRecentFavorite = id => {
+  useEffect(() => {
+    async function loadRecentlyViewed() {
+      try {
+        const recipes = await getRecentlyViewedRecipes(TEST_USER_ID);
+        setRecentRecipes(
+          recipes.map(recipe => ({
+            id: recipe.id,
+            name: recipe.title,
+            imageUrl: recipe.image_url,
+            difficulty: recipe.difficulty,
+            time: recipe.cooking_time,
+            servings: recipe.servings,
+            likes: "22",
+          })),
+        );
+      } catch (error) {
+        console.error("[MyPage] 최근 본 레시피 조회 실패", error);
+      }
+    }
+
+    loadRecentlyViewed();
+  }, []);
+
+  const goToRecipeDetail = id => {
+    navigate(`/recipes/${id}`);
+  };
+
+  const toggleRecentFavorite = (id, event) => {
+    event.stopPropagation();
     setFavoriteRecentIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -287,6 +315,7 @@ function MyPage() {
           </div>
         </section>
 
+        {recentRecipes.length > 0 && (
         <section className={styles.recentCard}>
           <div className={styles.recentHeader}>
             <h3 className={styles.recentTitle}>최근 본 레시피</h3>
@@ -324,15 +353,19 @@ function MyPage() {
             {recentRecipes.map(recipe => {
               const isFavorite = favoriteRecentIds.has(recipe.id);
               return (
-                <div key={recipe.id} className={styles.recentCardItem}>
+                <div
+                  key={recipe.id}
+                  className={styles.recentCardItem}
+                  onClick={() => goToRecipeDetail(recipe.id)}
+                >
                   <div className={styles.recentImageWrap}>
-                    <img src="" alt={recipe.name} className={styles.recentImage} />
+                    <img src={recipe.imageUrl} alt={recipe.name} className={styles.recentImage} />
                     <span
                       className={`${styles.recentDifficulty} ${
                         styles[difficultyStyles[recipe.difficulty]]
                       }`}
                     >
-                      {recipe.difficulty}
+                      {difficultyLabels[recipe.difficulty]}
                     </span>
                     <button
                       type="button"
@@ -340,7 +373,7 @@ function MyPage() {
                         isFavorite ? styles.recentFavoriteBtnActive : ""
                       }`}
                       aria-label="즐겨찾기"
-                      onClick={() => toggleRecentFavorite(recipe.id)}
+                      onClick={event => toggleRecentFavorite(recipe.id, event)}
                     >
                       <i className={isFavorite ? "fa-solid fa-heart" : "fa-regular fa-heart"} />
                     </button>
@@ -373,6 +406,7 @@ function MyPage() {
             })}
           </div>
         </section>
+        )}
       </div>
     </div>
   );

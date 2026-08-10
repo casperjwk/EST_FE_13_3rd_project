@@ -214,7 +214,6 @@
   width: 290px;
   height: 34px;
   padding: 5px 10px;
-  box-sizing: border-box;
   border: 1px solid var(--primary);
   border-radius: 999px;
   color: var(--primary);
@@ -432,7 +431,6 @@
   width: 310px;
   height: 92px;
   padding: 0 10px;
-  box-sizing: border-box;
   border: 1px solid var(--gray-1);
   border-radius: 12px;
   cursor: pointer;
@@ -618,7 +616,6 @@
   flex-shrink: 0;
   width: 200px;
   height: 231px;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--gray-1);
@@ -693,7 +690,6 @@
 .recentInfo {
   width: 200px;
   height: 95px;
-  box-sizing: border-box;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -705,6 +701,9 @@
   line-height: 150%;
   font-weight: 400;
   margin-bottom: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .recentMeta {
