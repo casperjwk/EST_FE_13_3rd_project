@@ -31,7 +31,11 @@ function Header() {
 
         <div className={styles['common-header__auth-area']}>
           {isLoggedIn ? (
-            <Link to="/mypage" className={styles['common-header__profile-circle']}></Link>
+            <Link to="/mypage" className={styles['common-header__profile']}>
+              <div className={styles['common-header__profile-circle']}></div>
+              <span className="text-s">{user.user_metadata?.nickname}</span>
+              <span className={`material-symbols-outlined ${styles['common-header__profile-arrow']}`}>expand_more</span>
+            </Link>
           ) : (
             <>
               <Link to="/login" className={`${styles['common-header__login-btn']} text-button-s`}>로그인</Link>
@@ -55,7 +59,7 @@ function Header() {
             <>
               <div className={styles['common-header__mobile-profile']}>
                 <div className={styles['common-header__profile-circle']}></div>
-                <span className="text-s">{user.email}</span>
+                <span className="text-s">{user.user_metadata?.nickname}</span>
               </div>
               <Link to="/" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>홈</Link>
               <Link to="/recipes" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>레시피</Link>
