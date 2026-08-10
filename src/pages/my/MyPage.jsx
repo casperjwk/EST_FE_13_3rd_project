@@ -156,7 +156,7 @@ function MyPage() {
 
   useEffect(() => {
     updateRecentScrollState();
-  }, []);
+  }, [recentRecipes]);
 
   const scrollRecent = direction => {
     const el = recentScrollRef.current;
