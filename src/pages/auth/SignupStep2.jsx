@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./SignupStep2.module.css";
+import { supabase } from "../../lib/supabase";
 
 const IconLightbulb = ({ size = 18, color = "var(--tag)" }) => (
   <svg
@@ -53,48 +54,51 @@ const IconSprout = ({ size = 18, color = "var(--primary)" }) => (
   </svg>
 );
 
-const ALLERGIES = [
-  "우유",
-  "생선",
-  "달걀",
-  "복숭아",
-  "밀",
-  "토마토",
-  "대두",
-  "땅콩",
-  "돼지고기",
-  "견과류",
-  "닭고기",
-  "새우",
-  "소고기",
-  "게",
-  "조개류",
-];
-
-const VEGAN_TYPES = [
-  { id: "none", label: "일반", desc: "제한 없음" },
-  { id: "flexitarian", label: "플렉시테리언", desc: "주로 채식, 가끔 육류 허용" },
-  { id: "polo", label: "폴로", desc: "닭고기까지 허용" },
-  { id: "pesco", label: "페스코", desc: "생선·해산물까지 허용" },
-  { id: "lacto-ovo", label: "락토-오보", desc: "유제품·달걀 허용" },
-  { id: "lacto", label: "락토", desc: "유제품만 허용" },
-  { id: "ovo", label: "오보", desc: "달걀만 허용" },
-  { id: "vegan", label: "비건", desc: "동물성 식품 완전 제외" },
-];
-
 export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
+  const [allergensList, setAllergensList] = useState([]);
+  const [veganTypesList, setVeganTypesList] = useState([]);
   const [selectedAllergies, setSelectedAllergies] = useState(initialData.allergies || []);
   const [selectedVegan, setSelectedVegan] = useState(initialData.veganType || "none");
 
-  const toggleAllergy = item => {
-    if (selectedAllergies.includes(item)) {
-      setSelectedAllergies(selectedAllergies.filter(a => a !== item));
+  // Supabase에서 알레르기 및 비건 타입 데이터 가져오기
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      try {
+        // 1. allergens 테이블 조회
+        const { data: allergensData, error: allergensError } = await supabase.from("allergens").select("id, name");
+
+        if (allergensError) {
+          console.error("알레르기 목록 로드 실패:", allergensError.message);
+        } else if (allergensData) {
+          setAllergensList(allergensData);
+        }
+
+        // 2. vegan_types 테이블 조회
+        const { data: veganData, error: veganError } = await supabase
+          .from("vegan_types")
+          .select("id, name, description");
+
+        if (veganError) {
+          console.error("비건 타입 목록 로드 실패:", veganError.message);
+        } else if (veganData) {
+          setVeganTypesList(veganData);
+        }
+      } catch (err) {
+        console.error("마스터 데이터 조회 예외:", err);
+      }
+    };
+
+    fetchMasterData();
+  }, []);
+
+  const toggleAllergy = id => {
+    if (selectedAllergies.includes(id)) {
+      setSelectedAllergies(selectedAllergies.filter(a => a !== id));
     } else {
-      setSelectedAllergies([...selectedAllergies, item]);
+      setSelectedAllergies([...selectedAllergies, id]);
     }
   };
 
-  // 이전 단계로 갈 때 현재 선택한 식단/알레르기 값도 함께 전달
   const handlePrevClick = () => {
     if (onPrev) {
       onPrev({
@@ -104,7 +108,6 @@ export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
     }
   };
 
-  // 가입 완료 및 데이터 전달
   const handleCompleteClick = () => {
     if (onComplete) {
       onComplete({
@@ -160,16 +163,16 @@ export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
           </p>
 
           <div className={styles.chipGrid}>
-            {ALLERGIES.map(item => {
-              const isSelected = selectedAllergies.includes(item);
+            {allergensList.map(item => {
+              const isSelected = selectedAllergies.includes(item.id);
               return (
                 <button
-                  key={item}
+                  key={item.id}
                   type="button"
                   className={`text-s ${styles.chip} ${isSelected ? styles.chipSelected : styles.chipUnselected}`}
-                  onClick={() => toggleAllergy(item)}
+                  onClick={() => toggleAllergy(item.id)}
                 >
-                  {item}
+                  {item.name}
                 </button>
               );
             })}
@@ -187,7 +190,7 @@ export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
           </p>
 
           <div className={styles.veganGrid}>
-            {VEGAN_TYPES.map(type => {
+            {veganTypesList.map(type => {
               const isSelected = selectedVegan === type.id;
               return (
                 <div
@@ -204,10 +207,10 @@ export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
                   />
                   <div>
                     <div className="text-button-s" style={{ color: "var(--black-1)" }}>
-                      {type.label}
+                      {type.name}
                     </div>
                     <div className="text-xs" style={{ color: "var(--gray-3)" }}>
-                      {type.desc}
+                      {type.description}
                     </div>
                   </div>
                 </div>
