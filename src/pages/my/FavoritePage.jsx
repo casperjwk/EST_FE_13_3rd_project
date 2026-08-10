@@ -4,10 +4,8 @@ import "material-icons/iconfont/filled.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "../../styles/global.css";
 import styles from "./FavoritePage.module.css";
+import { useAuth } from "../../context/AuthContext";
 import { getFavoriteRecipes } from "../../services/favoriteService";
-
-// 로그인 기능 연동 전까지 임시로 쓰는 테스트 유저 id - 로그인 연동되면 실제 로그인 유저 id로 교체
-const TEST_USER_ID = "980102d8-2d68-4ac3-b840-c09a78806907";
 
 // 식단 조건 요약 카드 - 알레르기 비교 로직 붙기 전까지 목업 유지
 const favoriteSummary = {
@@ -68,6 +66,7 @@ const statusConfig = {
 
 function FavoritePage() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
   const [favoriteRecipes, setFavoriteRecipes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,11 +74,17 @@ function FavoritePage() {
 
   useEffect(() => {
     async function loadFavoriteRecipes() {
+      if (!authUser) {
+        setFavoriteRecipes([]);
+        setIsLoading(false);
+        return;
+      }
+
       try {
         setIsLoading(true);
         setErrorMessage("");
 
-        const recipes = await getFavoriteRecipes(TEST_USER_ID);
+        const recipes = await getFavoriteRecipes(authUser.id);
         setFavoriteRecipes(
           recipes.map(recipe => ({
             id: recipe.id,
@@ -102,7 +107,7 @@ function FavoritePage() {
     }
 
     loadFavoriteRecipes();
-  }, []);
+  }, [authUser]);
 
   const toggleFavorite = (id, event) => {
     event.stopPropagation();

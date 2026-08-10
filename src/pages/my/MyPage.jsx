@@ -4,17 +4,12 @@ import "material-icons/iconfont/filled.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "../../styles/global.css";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
 import { getRecentlyViewedRecipes } from "../../services/recentViewService";
 import styles from "./MyPage.module.css";
 
-// 로그인 기능 연동 전까지 임시로 쓰는 테스트 유저 id - 로그인 연동되면 실제 로그인 유저 id로 교체
-const TEST_USER_ID = "980102d8-2d68-4ac3-b840-c09a78806907";
-
-const user = {
-  name: "홍길동",
-  email: "example@naver.com",
-  favoriteCount: 12,
-};
+// 즐겨찾기 개수는 아직 실제 집계 로직 없어서 목업 유지
+const MOCK_FAVORITE_COUNT = 12;
 
 // 수정상태(미선택 버전) 목업 데이터 - allergies를 채우면 "선택됨" 모습도 확인 가능
 const dietDraft = {
@@ -65,12 +60,47 @@ const difficultyLabels = {
 
 function MyPage() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [photoUrl, setPhotoUrl] = useState(null);
   const [allergyOptions, setAllergyOptions] = useState([]);
   const [selectedAllergies, setSelectedAllergies] = useState(dietDraft.allergies);
   const [selectedVeganType, setSelectedVeganType] = useState(dietDraft.veganType);
   const [favoriteRecentIds, setFavoriteRecentIds] = useState(() => new Set());
   const [recentRecipes, setRecentRecipes] = useState([]);
+  const [nickname, setNickname] = useState("");
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+
+  useEffect(() => {
+    if (!authUser) {
+      setNickname("");
+      setIsProfileLoading(false);
+      return;
+    }
+
+    let isActive = true;
+    setIsProfileLoading(true);
+
+    async function loadProfile() {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("nickname")
+        .eq("id", authUser.id)
+        .maybeSingle();
+      if (!isActive) return;
+      if (error) {
+        console.error("[MyPage] profile fetch error:", error);
+        setIsProfileLoading(false);
+        return;
+      }
+      setNickname(data?.nickname ?? "");
+      setIsProfileLoading(false);
+    }
+
+    loadProfile();
+    return () => {
+      isActive = false;
+    };
+  }, [authUser]);
 
   useEffect(() => {
     let isActive = true;
@@ -93,8 +123,13 @@ function MyPage() {
 
   useEffect(() => {
     async function loadRecentlyViewed() {
+      if (!authUser) {
+        setRecentRecipes([]);
+        return;
+      }
+
       try {
-        const recipes = await getRecentlyViewedRecipes(TEST_USER_ID);
+        const recipes = await getRecentlyViewedRecipes(authUser.id);
         setRecentRecipes(
           recipes.map(recipe => ({
             id: recipe.id,
@@ -112,7 +147,7 @@ function MyPage() {
     }
 
     loadRecentlyViewed();
-  }, []);
+  }, [authUser]);
 
   const goToRecipeDetail = id => {
     navigate(`/recipes/${id}`);
@@ -187,8 +222,10 @@ function MyPage() {
             </label>
 
             <div className={styles.profileCardText}>
-              <p className={styles.profileCardName}>{user.name}</p>
-              <p className={styles.profileCardEmail}>{user.email}</p>
+              {!isProfileLoading && (
+                <p className={styles.profileCardName}>{nickname || "사용자"}</p>
+              )}
+              <p className={styles.profileCardEmail}>{authUser?.email ?? ""}</p>
             </div>
           </div>
 
@@ -196,7 +233,7 @@ function MyPage() {
 
           <div className={styles.profileCardRight}>
             <div className={styles.profileCardFavoriteStat}>
-              <p className={styles.profileCardFavoriteCount}>{user.favoriteCount}</p>
+              <p className={styles.profileCardFavoriteCount}>{MOCK_FAVORITE_COUNT}</p>
               <p className={styles.profileCardFavoriteLabel}>즐겨찾기</p>
             </div>
             <Link to="/favorite" className={styles.profileCardFavoriteBtn}>
