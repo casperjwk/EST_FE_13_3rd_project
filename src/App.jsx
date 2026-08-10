@@ -20,8 +20,6 @@ import RecipeCreatePage from "./pages/admin/RecipeCreatePage";
 function App() {
   return (
     <AuthProvider>
-      {" "}
-      {/* 2. 전체 라우트를 감싸기 */}
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<HomePage />} />
