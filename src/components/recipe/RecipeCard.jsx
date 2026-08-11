@@ -1,4 +1,5 @@
 import styles from "./recipeCard.module.css";
+import { Link } from "react-router";
 
 
 /*
@@ -15,6 +16,7 @@ import styles from "./recipeCard.module.css";
       ai분석 부분
 */
 function RecipeCard({
+  recipeId,
   imageUrl,
   difficulty,
   name,
@@ -22,8 +24,11 @@ function RecipeCard({
   time,
   serves,
   likes,
-  onClick,
-}){
+  isFavorite = false,
+  onFavoriteClick,
+}) {
+
+  const recipePath = `/recipes/${recipeId}`;
 
   const difficultyClassName = {
     easy: styles.easy,
@@ -50,16 +55,22 @@ function RecipeCard({
       <div
         className={styles.cardImageArea}
       >
-        <img src={imageUrl} alt={name} className={styles.cardImage} onClick={onClick} />
+        <Link to={recipePath} className={styles.cardImageLink}>
+          <img src={imageUrl} alt={name} className={styles.cardImage} />
+        </Link>
         <span className={`${styles.cardDifficulty} ${difficultyClassName} text-xs`}>{difficultyLabel}</span>
-        <button 
-        className= {`${styles.cardHeart} material-symbols-outlined`} 
-        aria-label="좋아요"
-        >
-          favorite
-        </button>
+      <button
+        type="button"
+        className={`${styles.cardHeart} ${isFavorite ? styles.cardHeartActive : ""} material-symbols-outlined`}
+        aria-label={isFavorite ? "좋아요 취소" : "좋아요"}
+        aria-pressed={isFavorite}
+        onClick={onFavoriteClick}
+      >
+        favorite
+      </button>
       </div>
-      <div className={styles.cardTextArea} onClick={onClick}>
+      <div className={styles.cardTextArea}>
+        <Link to={recipePath} className={styles.cardContentLink}>
         <h4
           className={`${styles.cardTitle} text-subtitle-s`}
         >
@@ -88,15 +99,14 @@ function RecipeCard({
               <p className="text-xs">{likes}</p>
             </div>
           </div>
-
         </div>
+      </Link>
         
         
         <div>
           <button
             type="button"
             className={styles.recipeStatusBox}
-            onClick={onClick}
           >
             <div className={styles.recipeStatusLeft}>
               <span className="material-symbols-outlined" aria-hidden="true">
