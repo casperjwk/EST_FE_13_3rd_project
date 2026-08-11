@@ -29,9 +29,14 @@ type RecipeContext = {
   recipe_ingredients?: Array<{
     amount?: string | null;
     sort_order?: number | null;
-    ingredients?: {
-      name?: string | null;
-    } | null;
+    ingredients?:
+      | {
+          name?: string | null;
+        }
+      | Array<{
+          name?: string | null;
+        }>
+      | null;
   }>;
   recipe_steps?: Array<{
     step_number?: number | null;
@@ -150,7 +155,8 @@ function createCompactRecipe(recipe: RecipeContext) {
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .slice(0, 12)
     .map(item => {
-      const name = shorten(item.ingredients?.name, 18);
+      const ingredient = Array.isArray(item.ingredients) ? item.ingredients[0] : item.ingredients;
+      const name = shorten(ingredient?.name, 18);
       const amount = shorten(item.amount, 10);
 
       return `${name} ${amount}`.trim();
