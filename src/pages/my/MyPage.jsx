@@ -6,10 +6,15 @@ import "../../styles/global.css";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { getRecentlyViewedRecipes } from "../../services/recentViewService";
+import {
+  getFavoriteRecipeIds,
+  addFavorite,
+  removeFavorite,
+  getFavoriteCounts,
+} from "../../services/favoriteService";
 import styles from "./MyPage.module.css";
 
 // 즐겨찾기 개수는 아직 실제 집계 로직 없어서 목업 유지
-const MOCK_FAVORITE_COUNT = 12;
 
 // DB(vegan_types 테이블)의 id와 맞춰야 저장이 정상 동작함
 const veganTypes = [
@@ -62,7 +67,7 @@ function MyPage() {
   const [allergyOptions, setAllergyOptions] = useState([]);
   const [selectedAllergies, setSelectedAllergies] = useState([]);
   const [selectedVeganType, setSelectedVeganType] = useState(DEFAULT_VEGAN_TYPE_ID);
-  const [favoriteRecentIds, setFavoriteRecentIds] = useState(() => new Set());
+  const [favoriteRecipeIds, setFavoriteRecipeIds] = useState(() => new Set());
   const [recentRecipes, setRecentRecipes] = useState([]);
   const [nickname, setNickname] = useState("");
   const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -182,6 +187,7 @@ function MyPage() {
 
       try {
         const recipes = await getRecentlyViewedRecipes(authUser.id);
+        const favoriteCounts = await getFavoriteCounts(recipes.map(recipe => recipe.id));
         setRecentRecipes(
           recipes.map(recipe => ({
             id: recipe.id,
@@ -190,7 +196,7 @@ function MyPage() {
             difficulty: recipe.difficulty,
             time: recipe.cooking_time,
             servings: recipe.servings,
-            likes: "22",
+            likes: favoriteCounts[recipe.id] ?? 0,
           })),
         );
       } catch (error) {
@@ -201,13 +207,46 @@ function MyPage() {
     loadRecentlyViewed();
   }, [authUser, authLoading]);
 
+  useEffect(() => {
+    async function loadFavoriteIds() {
+      if (authLoading || !authUser) {
+        setFavoriteRecipeIds(new Set());
+        return;
+      }
+
+      try {
+        const ids = await getFavoriteRecipeIds(authUser.id);
+        setFavoriteRecipeIds(new Set(ids));
+      } catch (error) {
+        console.error("[MyPage] 즐겨찾기 여부 조회 실패", error);
+      }
+    }
+
+    loadFavoriteIds();
+  }, [authUser, authLoading]);
+
   const goToRecipeDetail = id => {
     navigate(`/recipes/${id}`);
   };
 
-  const toggleRecentFavorite = (id, event) => {
+  const toggleRecentFavorite = async (id, event) => {
     event.stopPropagation();
-    setFavoriteRecentIds(prev => {
+    if (!authUser) return;
+
+    const isCurrentlyFavorite = favoriteRecipeIds.has(id);
+    try {
+      if (isCurrentlyFavorite) {
+        await removeFavorite(authUser.id, id);
+      } else {
+        await addFavorite(authUser.id, id);
+      }
+    } catch (error) {
+      console.error("[MyPage] 즐겨찾기 변경 실패", error);
+      alert("즐겨찾기 상태를 변경하지 못했습니다. 다시 시도해주세요.");
+      return;
+    }
+
+    setFavoriteRecipeIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -216,6 +255,14 @@ function MyPage() {
       }
       return next;
     });
+
+    setRecentRecipes(prev =>
+      prev.map(recipe =>
+        recipe.id === id
+          ? { ...recipe, likes: recipe.likes + (isCurrentlyFavorite ? -1 : 1) }
+          : recipe,
+      ),
+    );
   };
 
   const handlePhotoChange = event => {
@@ -337,7 +384,7 @@ function MyPage() {
 
           <div className={styles.profileCardRight}>
             <div className={styles.profileCardFavoriteStat}>
-              <p className={styles.profileCardFavoriteCount}>{MOCK_FAVORITE_COUNT}</p>
+              <p className={styles.profileCardFavoriteCount}>{favoriteRecipeIds.size}</p>
               <p className={styles.profileCardFavoriteLabel}>즐겨찾기</p>
             </div>
             <Link to="/favorite" className={styles.profileCardFavoriteBtn}>
@@ -559,7 +606,7 @@ function MyPage() {
             onScroll={updateRecentScrollState}
           >
             {recentRecipes.map(recipe => {
-              const isFavorite = favoriteRecentIds.has(recipe.id);
+              const isFavorite = favoriteRecipeIds.has(recipe.id);
               return (
                 <div
                   key={recipe.id}

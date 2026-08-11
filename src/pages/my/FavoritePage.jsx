@@ -4,22 +4,13 @@ import "material-icons/iconfont/filled.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "../../styles/global.css";
 import styles from "./FavoritePage.module.css";
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
-import { getFavoriteRecipes } from "../../services/favoriteService";
-
-// 식단 조건 요약 카드 - 알레르기 비교 로직 붙기 전까지 목업 유지
-const favoriteSummary = {
-  userName: "홍길동",
-  safeCount: 5,
-  replaceableCount: 0,
-  warningCount: 0,
-  aiReplacedCount: 0,
-  appliedConditions: [
-    { label: "우유", type: "danger" },
-    { label: "돼지고기", type: "danger" },
-    { label: "플렉시테리언", type: "primary" },
-  ],
-};
+import {
+  getFavoriteRecipes,
+  removeFavorite,
+  getFavoriteCounts,
+} from "../../services/favoriteService";
 
 const difficultyStyles = {
   easy: "cardDifficultyEasy",
@@ -67,10 +58,52 @@ const statusConfig = {
 function FavoritePage() {
   const navigate = useNavigate();
   const { user: authUser, loading: authLoading } = useAuth();
-  const [favoriteIds, setFavoriteIds] = useState(() => new Set());
   const [favoriteRecipes, setFavoriteRecipes] = useState([]);
+  const [removingIds, setRemovingIds] = useState(() => new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [summaryNickname, setSummaryNickname] = useState("");
+  const [appliedConditions, setAppliedConditions] = useState([]);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!authUser) {
+      setSummaryNickname("");
+      setAppliedConditions([]);
+      return;
+    }
+
+    async function loadDietSummary() {
+      const [{ data: profileData }, { data: allergyRows }, { data: allergensList }, { data: veganTypesList }] =
+        await Promise.all([
+          supabase.from("profiles").select("nickname, vegan_type_id").eq("id", authUser.id).maybeSingle(),
+          supabase.from("user_allergies").select("allergen_id").eq("user_id", authUser.id),
+          supabase.from("allergens").select("id, name"),
+          supabase.from("vegan_types").select("id, name"),
+        ]);
+
+      setSummaryNickname(profileData?.nickname || "사용자");
+
+      const allergenNameById = new Map((allergensList ?? []).map(a => [a.id, a.name]));
+      const veganNameById = new Map((veganTypesList ?? []).map(v => [v.id, v.name]));
+
+      const conditions = (allergyRows ?? []).map(row => ({
+        label: allergenNameById.get(row.allergen_id) ?? row.allergen_id,
+        type: "danger",
+      }));
+      conditions.push({
+        label: veganNameById.get(profileData?.vegan_type_id) ?? "일반",
+        type: "primary",
+      });
+
+      setAppliedConditions(conditions);
+    }
+
+    loadDietSummary();
+  }, [authUser, authLoading]);
 
   useEffect(() => {
     async function loadFavoriteRecipes() {
@@ -89,6 +122,7 @@ function FavoritePage() {
         setErrorMessage("");
 
         const recipes = await getFavoriteRecipes(authUser.id);
+        const favoriteCounts = await getFavoriteCounts(recipes.map(recipe => recipe.id));
         setFavoriteRecipes(
           recipes.map(recipe => ({
             id: recipe.id,
@@ -98,7 +132,7 @@ function FavoritePage() {
             difficulty: recipe.difficulty,
             time: recipe.cooking_time,
             servings: recipe.servings,
-            likes: "22",
+            likes: favoriteCounts[recipe.id] ?? 0,
             status: "safe",
           })),
         );
@@ -113,17 +147,24 @@ function FavoritePage() {
     loadFavoriteRecipes();
   }, [authUser, authLoading]);
 
-  const toggleFavorite = (id, event) => {
+  const unfavorite = async (recipeId, event) => {
     event.stopPropagation();
-    setFavoriteIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    if (!authUser || removingIds.has(recipeId)) return;
+
+    setRemovingIds(prev => new Set(prev).add(recipeId));
+    try {
+      await removeFavorite(authUser.id, recipeId);
+      setFavoriteRecipes(prev => prev.filter(recipe => recipe.id !== recipeId));
+    } catch (error) {
+      console.error("[HankkiLab] 즐겨찾기 삭제 실패", error);
+      alert("즐겨찾기에서 삭제하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setRemovingIds(prev => {
+        const next = new Set(prev);
+        next.delete(recipeId);
+        return next;
+      });
+    }
   };
 
   const goToRecipeDetail = id => {
@@ -136,6 +177,11 @@ function FavoritePage() {
 
   const hasFavorites = !isLoading && !errorMessage && favoriteRecipes.length > 0;
   const showEmptyState = !isLoading && !errorMessage && favoriteRecipes.length === 0;
+
+  const safeCount = favoriteRecipes.filter(recipe => recipe.status === "safe").length;
+  const replaceableCount = favoriteRecipes.filter(recipe => recipe.status === "replaceable").length;
+  const warningCount = favoriteRecipes.filter(recipe => recipe.status === "warning").length;
+  const aiReplacedCount = favoriteRecipes.filter(recipe => recipe.status === "replaced").length;
 
   return (
     <div className={styles.favoritePage}>
@@ -186,7 +232,7 @@ function FavoritePage() {
                   horizontal_rule
                 </span>
                 <span className={styles.summaryTitleMuted}>
-                  {favoriteSummary.userName}님의 즐겨찾기 {favoriteRecipes.length}개 기준
+                  {summaryNickname}님의 즐겨찾기 {favoriteRecipes.length}개 기준
                 </span>
               </p>
               <span className={styles.summaryStatusBadge}>
@@ -199,29 +245,25 @@ function FavoritePage() {
 
             <div className={styles.summaryStats}>
               <div className={styles.statItem}>
-                <p className={`${styles.statNumber} ${styles.statColorSafe}`}>
-                  {favoriteSummary.safeCount}
-                </p>
+                <p className={`${styles.statNumber} ${styles.statColorSafe}`}>{safeCount}</p>
                 <p className={`${styles.statLabel} ${styles.statColorSafe}`}>안전</p>
                 <p className={styles.statDesc}>안전 레시피</p>
               </div>
               <div className={styles.statItem}>
                 <p className={`${styles.statNumber} ${styles.statColorReplace}`}>
-                  {favoriteSummary.replaceableCount}
+                  {replaceableCount}
                 </p>
                 <p className={`${styles.statLabel} ${styles.statColorReplace}`}>대체 가능</p>
                 <p className={styles.statDesc}>대체 재료 추천</p>
               </div>
               <div className={styles.statItem}>
-                <p className={`${styles.statNumber} ${styles.statColorWarning}`}>
-                  {favoriteSummary.warningCount}
-                </p>
+                <p className={`${styles.statNumber} ${styles.statColorWarning}`}>{warningCount}</p>
                 <p className={`${styles.statLabel} ${styles.statColorWarning}`}>주의 감지</p>
                 <p className={styles.statDesc}>알레르기 포함</p>
               </div>
               <div className={styles.statItem}>
                 <p className={`${styles.statNumber} ${styles.statColorReplaced}`}>
-                  {favoriteSummary.aiReplacedCount}
+                  {aiReplacedCount}
                 </p>
                 <p className={`${styles.statLabel} ${styles.statColorReplaced}`}>AI 대체 완료</p>
                 <p className={styles.statDesc}>대체 레시피</p>
@@ -232,7 +274,7 @@ function FavoritePage() {
           <div className={styles.appliedConditions}>
             <p className={styles.appliedLabel}>적용 조건</p>
             <div className={styles.conditionChipList}>
-              {favoriteSummary.appliedConditions.map(condition => (
+              {appliedConditions.map(condition => (
                 <span
                   key={condition.label}
                   className={
@@ -250,7 +292,6 @@ function FavoritePage() {
 
         <div className={styles.cardGrid}>
           {favoriteRecipes.map(recipe => {
-            const isFavorite = favoriteIds.has(recipe.id);
             return (
               <div
                 key={recipe.id}
@@ -266,13 +307,12 @@ function FavoritePage() {
                   </span>
                   <button
                     type="button"
-                    className={`${styles.cardFavoriteBtn} ${
-                      isFavorite ? styles.cardFavoriteBtnActive : ""
-                    }`}
-                    aria-label="즐겨찾기"
-                    onClick={event => toggleFavorite(recipe.id, event)}
+                    className={`${styles.cardFavoriteBtn} ${styles.cardFavoriteBtnActive}`}
+                    aria-label="즐겨찾기 삭제"
+                    disabled={removingIds.has(recipe.id)}
+                    onClick={event => unfavorite(recipe.id, event)}
                   >
-                    <i className={isFavorite ? "fa-solid fa-heart" : "fa-regular fa-heart"} />
+                    <i className="fa-solid fa-heart" />
                   </button>
                 </div>
                 <div className={styles.cardInfo}>
