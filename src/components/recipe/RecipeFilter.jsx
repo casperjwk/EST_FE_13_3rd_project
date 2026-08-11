@@ -31,62 +31,44 @@ const veganItems = [
 ];
 
 function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChange }){
-  const [veganFilters, setVeganFilters] = useState(veganFilter ?? "일반");
-  const [localAllergyFilters, setLocalAllergyFilters] = useState(allergyFilters ?? {});
+  const currentVeganFilter = veganFilter ?? "일반";
+  const currentAllergyFilters = allergyFilters ?? {};
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  useEffect(() => {
-  setVeganFilters(veganFilter ?? "일반");
-}, [veganFilter]);
-
-useEffect(() => {
-  setLocalAllergyFilters(allergyFilters ?? {});
-}, [allergyFilters]);
 
   
     const handleAllergyClick = item => {
-    setLocalAllergyFilters(prev => {
-      const current = prev[item] || "none";
+      const current = currentAllergyFilters[item] || "none";
 
       let next = "none";
       if (current === "none") next = "warning";
       else if (current === "warning") next = "exclude";
 
-      const nextFilters = {
-        ...prev,
+      onAllergyChange?.({
+        ...currentAllergyFilters,
         [item]: next,
-      };
-
-      onAllergyChange?.(nextFilters);
-      return nextFilters;
-    });
-  };
+      });
+    };
 
 
-  const handleVeganClick = (item) => {
-    setVeganFilters(item);
-    onVeganChange?.(item);
-  }
+
+ const handleVeganClick = item => {
+  onVeganChange?.(item);
+};
 
 const resetAllFilters = () => {
-  setLocalAllergyFilters({});
   onAllergyChange?.({});
-
-  setVeganFilters("일반");
   onVeganChange?.("일반");
 };
 
 const removeAllergyFilter = item => {
-  setLocalAllergyFilters(prev => {
-    const next = { ...prev };
-    delete next[item];
+  const next = { ...currentAllergyFilters };
+  delete next[item];
 
-    onAllergyChange?.(next);
-    return next;
-  });
+  onAllergyChange?.(next);
 };
 
-  const selectedAllergies = Object.entries(localAllergyFilters).filter(
+  const selectedAllergies = Object.entries(currentAllergyFilters).filter(
     ([,state]) => state !=="none"
   );
 
@@ -115,7 +97,7 @@ const removeAllergyFilter = item => {
           </div>
           <div className={styles.chipList}>
             {allergyItems.map((item)=>{
-              const state = localAllergyFilters[item] || "none";
+              const state = currentAllergyFilters[item] || "none";
 
               return (
                 <button
@@ -138,7 +120,7 @@ const removeAllergyFilter = item => {
 
           <div className={styles.chipList}>
             {veganItems.map((item)=>{
-              const selected = veganFilters === item;
+              const selected = currentVeganFilter === item;
               return(
                 <button
                   key={item}
@@ -181,6 +163,6 @@ const removeAllergyFilter = item => {
       </div>
     </div>
   )
-}
+};
 
 export default FilterPanel;

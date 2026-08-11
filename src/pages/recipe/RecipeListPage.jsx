@@ -73,7 +73,7 @@ function RecipeListPage() {
     if (allergyError) {
       console.error("[RecipeListPage] user_allergies 조회 실패:", allergyError);
     } else {
-      const nextAllergyFilters = (allergyRows ?? {}).reduce((acc, row) => {
+      const nextAllergyFilters = (allergyRows ?? []).reduce((acc, row) => {
         const allergen = Array.isArray(row.allergens) ? row.allergens[0] : row.allergens;
         if (allergen?.name) {
           acc[allergen.name] = "exclude";
