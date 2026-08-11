@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import { getFavoriteRecipeIds, removeFavorite, getFavoriteCounts } from '../../services/favoriteService';
-import { getPopularRecipes, getRecipesByIds } from '../../services/recipeService';
+import { getPopularRecipes, getRecipesByIds, getRecipesByVeganType } from '../../services/recipeService';
 import { getUserSafetyConditions, getRecipeSafetyStatus } from '../../utils/recipeSafety';
 import hero1 from '../../assets/hero1.png';
 import hero2 from '../../assets/hero2.png';
@@ -37,15 +37,20 @@ const STEPS = [
   { icon: 'restaurant', title: '맞춤 레시피 추천', desc: '대체재료까지 함께 제안받기' },
 ];
 
-// TODO: 비건 섹션은 DB 스키마 확인 후 실제 데이터로 교체
 const VEGAN_TABS = ['전체', '비건', '락토', '오보', '페스코'];
 const VEGAN_TABS_MORE = ['일반', '플렉시테리언', '폴로', '락토-오보'];
 
-const VEGAN_RECIPES = [
-  { id: 8, imageUrl: '', difficulty: 'easy', name: '두부 스크램블', description: '달걀 없이 즐기는 아침 식사', time: 15, serves: 1, likes: 29 },
-  { id: 9, imageUrl: '', difficulty: 'normal', name: '병아리콩 커리', description: '고소하고 든든한 비건 커리', time: 30, serves: 2, likes: 38 },
-  { id: 10, imageUrl: '', difficulty: 'easy', name: '아보카도 토스트', description: '간단하게 즐기는 비건 브런치', time: 10, serves: 1, likes: 51 },
-];
+const VEGAN_TAB_ID_MAP = {
+  '전체': null,
+  '비건': 'vegan',
+  '락토': 'lacto',
+  '오보': 'ovo',
+  '페스코': 'pesco',
+  '일반': 'general',
+  '플렉시테리언': 'flexitarian',
+  '폴로': 'pollo',
+  '락토-오보': 'lacto_ovo',
+};
 
 function HomePage() {
   const [current, setCurrent] = useState(0);
@@ -136,14 +141,38 @@ function HomePage() {
     };
   }, []);
 
+  // 비건 유형별 추천
   const [activeVeganTab, setActiveVeganTab] = useState('전체');
   const [showAllVeganTabs, setShowAllVeganTabs] = useState(false);
   const [veganLoading, setVeganLoading] = useState(false);
+  const [veganRecipes, setVeganRecipes] = useState([]);
+
+  const loadVeganRecipes = async (tab) => {
+    setVeganLoading(true);
+    const recipes = await getRecipesByVeganType(VEGAN_TAB_ID_MAP[tab], 3);
+    const counts = await getFavoriteCounts(recipes.map((r) => r.id));
+    setVeganRecipes(
+      recipes.map((recipe) => ({
+        id: recipe.id,
+        imageUrl: recipe.image_url,
+        difficulty: recipe.difficulty,
+        name: recipe.title,
+        description: recipe.description,
+        time: recipe.cooking_time,
+        serves: recipe.servings,
+        likes: counts[recipe.id] ?? 0,
+      })),
+    );
+    setVeganLoading(false);
+  };
+
+  useEffect(() => {
+    loadVeganRecipes('전체');
+  }, []);
 
   const handleVeganTabClick = (tab) => {
     setActiveVeganTab(tab);
-    setVeganLoading(true);
-    setTimeout(() => setVeganLoading(false), 600); // TODO: 실제 API 연동 시 교체
+    loadVeganRecipes(tab);
   };
 
   return (
@@ -350,7 +379,7 @@ function HomePage() {
             </div>
           ) : (
             <div className={styles['home-vegan__grid']}>
-              {VEGAN_RECIPES.map((recipe) => (
+              {veganRecipes.map((recipe) => (
                 <RecipeCard
                   key={recipe.id}
                   imageUrl={recipe.imageUrl}
