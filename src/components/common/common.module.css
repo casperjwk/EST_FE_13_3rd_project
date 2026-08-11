@@ -12,6 +12,10 @@
   color: var(--primary);
 }
 
+.common-badge--needReplacement {
+  color: var(--warning);
+}
+
 .common-badge--danger {
   color: var(--danger);
 }
