@@ -293,12 +293,11 @@ function FavoritePage() {
         <div className={styles.cardGrid}>
           {favoriteRecipes.map(recipe => {
             return (
-              <div
-                key={recipe.id}
-                className={styles.cardItem}
-                onClick={() => goToRecipeDetail(recipe.id)}
-              >
-                <div className={styles.cardImageWrap}>
+              <div key={recipe.id} className={styles.cardItem}>
+                <div
+                  className={styles.cardImageWrap}
+                  onClick={() => goToRecipeDetail(recipe.id)}
+                >
                   <img src={recipe.imageUrl} alt={recipe.name} className={styles.cardImage} />
                   <span
                     className={`${styles.cardDifficulty} ${styles[difficultyStyles[recipe.difficulty]]}`}
@@ -316,7 +315,12 @@ function FavoritePage() {
                   </button>
                 </div>
                 <div className={styles.cardInfo}>
-                  <p className={styles.cardName}>{recipe.name}</p>
+                  <p
+                    className={styles.cardName}
+                    onClick={() => goToRecipeDetail(recipe.id)}
+                  >
+                    {recipe.name}
+                  </p>
                   <p className={styles.cardDescription}>{recipe.description}</p>
                   <div className={styles.cardMeta}>
                     <span className={styles.cardMetaItem}>

@@ -242,9 +242,7 @@
   font-size: 16px;
 }
 
-/* 식단정보 (조회상태) */
-
-/* 식단정보 (수정상태) */
+/* 식단정보 (공통) - 조회/수정 상태 둘 다 사용 */
 .dietCard {
   margin-top: 20px;
   padding: 40px 30px;
@@ -279,6 +277,7 @@
   gap: 10px;
 }
 
+/* 식단정보 (수정상태) - 취소/저장 버튼 */
 .dietCancelBtn {
   display: inline-flex;
   align-items: center;
@@ -297,6 +296,7 @@
   color: var(--black-2);
 }
 
+/* 식단정보 (조회상태) - 수정 버튼 */
 .dietEditBtn {
   display: inline-flex;
   align-items: center;
@@ -321,6 +321,7 @@
   font-size: 16px;
 }
 
+/* 식단정보 (수정상태) - 취소/저장 버튼 */
 .dietSaveBtn {
   display: inline-flex;
   align-items: center;
@@ -346,6 +347,7 @@
   font-size: 16px;
 }
 
+/* 식단정보 (공통) - 행/라벨 */
 .dietRow + .dietRow {
   margin-top: 40px;
 }
@@ -367,6 +369,7 @@
   }
 }
 
+/* 식단정보 (수정상태) - 안내 설명 문구 */
 .dietDescription {
   margin-bottom: 20px;
   color: var(--gray-3);
@@ -411,6 +414,7 @@
   color: var(--danger);
 }
 
+/* 식단정보 (공통) - 알레르기 미선택 안내 문구 */
 .dietNoticeText {
   color: var(--gray-3);
   font-size: var(--small);
@@ -418,6 +422,7 @@
   font-weight: 400;
 }
 
+/* 식단정보 (조회상태) - 알레르기 정보 */
 .dietViewValue {
   margin-top: 10px;
 }
@@ -537,6 +542,7 @@
   }
 }
 
+/* 식단정보 (조회상태) - 비건 유형 (알레르기 조회상태, 적용 조건 카드에서도 같이 씀) */
 .dietChipList {
   display: flex;
   flex-wrap: wrap;
@@ -652,6 +658,7 @@
   height: 135px;
   flex-shrink: 0;
   background: var(--gray-1);
+  cursor: pointer;
 }
 
 .recentImage {
@@ -719,11 +726,14 @@
 }
 
 .recentName {
+  align-self: flex-start;
+  max-width: 100%;
   color: var(--black-1);
   font-size: var(--large);
   line-height: 150%;
   font-weight: 400;
   margin-bottom: 10px;
+  cursor: pointer;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -752,4 +762,3 @@
 .recentMetaItemLikes {
   color: var(--danger);
 }
-

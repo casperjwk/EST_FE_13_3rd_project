@@ -608,12 +608,11 @@ function MyPage() {
             {recentRecipes.map(recipe => {
               const isFavorite = favoriteRecipeIds.has(recipe.id);
               return (
-                <div
-                  key={recipe.id}
-                  className={styles.recentCardItem}
-                  onClick={() => goToRecipeDetail(recipe.id)}
-                >
-                  <div className={styles.recentImageWrap}>
+                <div key={recipe.id} className={styles.recentCardItem}>
+                  <div
+                    className={styles.recentImageWrap}
+                    onClick={() => goToRecipeDetail(recipe.id)}
+                  >
                     <img src={recipe.imageUrl} alt={recipe.name} className={styles.recentImage} />
                     <span
                       className={`${styles.recentDifficulty} ${
@@ -634,7 +633,12 @@ function MyPage() {
                     </button>
                   </div>
                   <div className={styles.recentInfo}>
-                    <p className={styles.recentName}>{recipe.name}</p>
+                    <p
+                      className={styles.recentName}
+                      onClick={() => goToRecipeDetail(recipe.id)}
+                    >
+                      {recipe.name}
+                    </p>
                     <div className={styles.recentMeta}>
                       <span className={styles.recentMetaItem}>
                         <span className="material-icons" aria-hidden="true">
