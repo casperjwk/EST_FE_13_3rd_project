@@ -6,7 +6,8 @@ import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { getRecips } from "../../services/recipeSearchService";
 import { filterRecipesByAllergies, filterRecipesByVeganType } from "../../utils/recipeFilter";
-
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
 
 const RECIPE_LOAD_COUNT = 6;
 const SORT_OPTIONS = [
@@ -17,6 +18,7 @@ const SORT_OPTIONS = [
 
 function RecipeListPage() {
   const navigate = useNavigate();
+  const { user: authUser, loading: authLoading } =useAuth();
 
   const [recipes, setRecipes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,6 +27,70 @@ function RecipeListPage() {
   const [sortType, setSortType] = useState("created");
   const [veganFilter, setVeganFilter] = useState("일반");
   const [allergyFilters, setAllergyFilters] = useState({});
+
+
+  useEffect(() => {
+  if (authLoading) return;
+
+  if (!authUser) {
+    setVeganFilter("일반");
+    setAllergyFilters({});
+    return;
+  }
+
+  let isActive = true;
+
+  async function loadUserFilters() {
+    const [{ data: profileData, error: profileError }, { data: allergyRows, error: allergyError }] =
+      await Promise.all([
+        supabase.from("profiles").select("vegan_type_id").eq("id", authUser.id).maybeSingle(),
+        supabase
+          .from("user_allergies")
+          .select("allergens(name)")
+          .eq("user_id", authUser.id),
+      ]);
+
+    if (!isActive) return;
+
+    if (profileError) {
+      console.error("[RecipeListPage] vegan_type_id 조회 실패:", profileError);
+    } else if (profileData?.vegan_type_id) {
+      const { data: veganTypeData, error: veganTypeError } = await supabase
+        .from("vegan_types")
+        .select("name")
+        .eq("id", profileData.vegan_type_id)
+        .maybeSingle();
+
+      if (!isActive) return;
+
+      if (veganTypeError) {
+        console.error("[RecipeListPage] vegan type 조회 실패:", veganTypeError);
+      } else {
+        setVeganFilter(veganTypeData?.name ?? "일반");
+      }
+    }
+
+    if (allergyError) {
+      console.error("[RecipeListPage] user_allergies 조회 실패:", allergyError);
+    } else {
+      const nextAllergyFilters = (allergyRows ?? {}).reduce((acc, row) => {
+        const allergen = Array.isArray(row.allergens) ? row.allergens[0] : row.allergens;
+        if (allergen?.name) {
+          acc[allergen.name] = "exclude";
+        }
+        return acc;
+      }, {});
+
+      setAllergyFilters(nextAllergyFilters);
+    }
+  }
+
+  loadUserFilters();
+
+  return () => {
+    isActive = false;
+  };
+}, [authUser, authLoading]);
 
 
 

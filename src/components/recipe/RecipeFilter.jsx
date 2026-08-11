@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import styles from "./recipeFilter.module.css";
 
 const allergyItems = [
@@ -34,6 +34,14 @@ function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChan
   const [veganFilters, setVeganFilters] = useState(veganFilter ?? "일반");
   const [localAllergyFilters, setLocalAllergyFilters] = useState(allergyFilters ?? {});
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  useEffect(() => {
+  setVeganFilters(veganFilter ?? "일반");
+}, [veganFilter]);
+
+useEffect(() => {
+  setLocalAllergyFilters(allergyFilters ?? {});
+}, [allergyFilters]);
 
   
     const handleAllergyClick = item => {
