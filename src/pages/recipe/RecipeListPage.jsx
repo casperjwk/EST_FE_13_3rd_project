@@ -2,11 +2,16 @@ import RecipeCard from "../../components/recipe/RecipeCard";
 import FilterPanel from "../../components/recipe/RecipeFilter";
 import RecipeCardSkeleton from "../../components/recipe/RecipeCardSkeleton";
 import style from "./RecipeListPage.module.css";
-import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { getRecips } from "../../services/recipeSearchService";
 import { filterRecipesByAllergies, filterRecipesByVeganType } from "../../utils/recipeFilter";
-
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
+import {
+  getFavoriteRecipeIds,
+  addFavorite,
+  removeFavorite,
+} from "../../services/favoriteService";
 
 const RECIPE_LOAD_COUNT = 6;
 const SORT_OPTIONS = [
@@ -16,7 +21,7 @@ const SORT_OPTIONS = [
 ];
 
 function RecipeListPage() {
-  const navigate = useNavigate();
+  const { user: authUser, loading: authLoading } =useAuth();
 
   const [recipes, setRecipes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,8 +30,119 @@ function RecipeListPage() {
   const [sortType, setSortType] = useState("created");
   const [veganFilter, setVeganFilter] = useState("일반");
   const [allergyFilters, setAllergyFilters] = useState({});
+  const [favoriteRecipeIds, setFavoriteRecipeIds] = useState(() => new Set());
 
 
+  useEffect(() => {
+  if (authLoading) return;
+
+  if (!authUser) {
+    setVeganFilter("일반");
+    setAllergyFilters({});
+    return;
+  }
+
+  
+  
+  let isActive = true;
+  
+  async function loadUserFilters() {
+    const [{ data: profileData, error: profileError }, { data: allergyRows, error: allergyError }] =
+    await Promise.all([
+      supabase.from("profiles").select("vegan_type_id").eq("id", authUser.id).maybeSingle(),
+      supabase
+      .from("user_allergies")
+      .select("allergens(name)")
+      .eq("user_id", authUser.id),
+    ]);
+    
+    if (!isActive) return;
+    
+    if (profileError) {
+      console.error("[RecipeListPage] vegan_type_id 조회 실패:", profileError);
+    } else if (profileData?.vegan_type_id) {
+      const { data: veganTypeData, error: veganTypeError } = await supabase
+      .from("vegan_types")
+      .select("name")
+      .eq("id", profileData.vegan_type_id)
+      .maybeSingle();
+      
+      if (!isActive) return;
+      
+      if (veganTypeError) {
+        console.error("[RecipeListPage] vegan type 조회 실패:", veganTypeError);
+      } else {
+        setVeganFilter(veganTypeData?.name ?? "일반");
+      }
+    }
+    
+    if (allergyError) {
+      console.error("[RecipeListPage] user_allergies 조회 실패:", allergyError);
+    } else {
+      const nextAllergyFilters = (allergyRows ?? []).reduce((acc, row) => {
+        const allergen = Array.isArray(row.allergens) ? row.allergens[0] : row.allergens;
+        if (allergen?.name) {
+          acc[allergen.name] = "exclude";
+        }
+        return acc;
+      }, {});
+      
+      setAllergyFilters(nextAllergyFilters);
+    }
+  }
+  
+  loadUserFilters();
+  
+  return () => {
+    isActive = false;
+  };
+}, [authUser, authLoading]);
+
+useEffect(() => {
+async function loadFavoriteIds() {
+  if (authLoading || !authUser) {
+    setFavoriteRecipeIds(new Set());
+    return;
+  }
+
+  const ids = await getFavoriteRecipeIds(authUser.id);
+  setFavoriteRecipeIds(new Set(ids));
+}
+
+loadFavoriteIds();
+}, [authUser, authLoading]);
+
+const handleFavoriteClick = async recipeId => {
+if (!authUser) {
+  alert("로그인이 필요합니다.");
+  return;
+}
+
+const isCurrentlyFavorite = favoriteRecipeIds.has(recipeId);
+
+if (isCurrentlyFavorite) {
+  await removeFavorite(authUser.id, recipeId);
+} else {
+  await addFavorite(authUser.id, recipeId);
+}
+
+setFavoriteRecipeIds(prev => {
+  const next = new Set(prev);
+  isCurrentlyFavorite ? next.delete(recipeId) : next.add(recipeId);
+  return next;
+});
+
+setRecipes(prev =>
+  prev.map(recipe =>
+    recipe.id === recipeId
+      ? {
+          ...recipe,
+          likes: Math.max(0, (recipe.likes ?? 0) + (isCurrentlyFavorite ? -1 : 1)),
+        }
+      : recipe,
+  ),
+);
+};
 
 const allergyFilteredRecipes = filterRecipesByAllergies(recipes, allergyFilters);
 const filteredRecipes = filterRecipesByVeganType(allergyFilteredRecipes, veganFilter);
@@ -35,7 +151,7 @@ const visibleRecipes = filteredRecipes.slice(0, visibleCount);
 const hasMoreRecipes = visibleCount < filteredRecipes.length;
 
 
-  useEffect(() => {
+useEffect(() => {
     async function loadRecipes() {
       try {
         setIsLoading(true);
@@ -55,12 +171,6 @@ const hasMoreRecipes = visibleCount < filteredRecipes.length;
 
     loadRecipes();
   },[sortType]);
-
-
-
-  const handleRecipeClick = recipeId => {
-    navigate(`/recipes/${recipeId}`);
-  };
 
   const handleLoadMore = () =>{
     setVisibleCount(prevCount => prevCount + RECIPE_LOAD_COUNT);
@@ -114,6 +224,7 @@ const hasMoreRecipes = visibleCount < filteredRecipes.length;
         : visibleRecipes.map((recipe) =>(
           <RecipeCard
           key={recipe.id}
+          recipeId={recipe.id}
           imageUrl={recipe.image_url}
           difficulty={recipe.difficulty}
           name={recipe.title}
@@ -121,7 +232,8 @@ const hasMoreRecipes = visibleCount < filteredRecipes.length;
           time={recipe.cooking_time}
           serves={recipe.servings}
           likes={recipe.likes ?? 0}
-          onClick={()=> handleRecipeClick(recipe.id)}
+          isFavorite={favoriteRecipeIds.has(recipe.id)}
+          onFavoriteClick={() => handleFavoriteClick(recipe.id)}
           />
         ))
         

@@ -69,6 +69,10 @@
   border-radius: 100%;
   background-color: white;
 }
+.cardHeartActive {
+  color: white;
+  background-color: var(--danger);
+}
 
 
 .cardTextArea{
