@@ -41,6 +41,17 @@ function findMatchedAllergy(ingredient, allergenIds, categoryMappings, allergyOp
   )?.name;
 }
 
+function isRestrictedForVeganType(ingredient, veganTypeId, veganTypeRestrictions) {
+  if (veganTypeId == null || veganTypeId === "") return false;
+
+  return veganTypeRestrictions.some(
+    restriction =>
+      String(restriction.vegan_type_id) === String(veganTypeId) &&
+      String(restriction.category_id ?? restriction.food_category_id) ===
+        String(ingredient.categoryId),
+  );
+}
+
 function Icon({ name, size = 18 }) {
   const materialIconNames = {
     user: "person",
@@ -101,11 +112,13 @@ function Condition({ allergies, veganType, onOpenConditions }) {
 function IngredientPanel({ isComplete, ingredients }) {
   const displayedIngredients = isComplete
     ? ingredients.map(ingredient =>
-        ingredient.warning
+        ingredient.warning || ingredient.needReplacement
           ? {
               name: "느타리버섯",
               amount: "200g",
-              replacement: "돼지고기 알레르기 + 비건 대체",
+              replacement: [ingredient.warning, ingredient.needReplacement]
+                .filter(Boolean)
+                .join(" + "),
               original: ingredient,
             }
           : ingredient,
@@ -121,9 +134,17 @@ function IngredientPanel({ isComplete, ingredients }) {
         {displayedIngredients.map(ingredient => (
           <li
             key={ingredient.id ?? ingredient.name}
-            className={cn(ingredient.warning ? "ingredient ingredient--warning" : "ingredient")}
+            className={cn("ingredient")}
           >
-            <div className={cn("ingredient__row")}>
+            <div
+              className={cn(
+                "ingredient__row",
+                ingredient.warning ? "ingredient--warning" : "",
+                ingredient.needReplacement && !ingredient.warning
+                  ? "ingredient--replacement-needed"
+                  : "",
+              )}
+            >
               <div>
                 {ingredient.original && (
                   <del className="text-xs">
@@ -135,7 +156,13 @@ function IngredientPanel({ isComplete, ingredients }) {
               </div>
               <Badge
                 type={
-                  ingredient.warning ? "danger" : ingredient.replacement ? "replacement" : "safe"
+                  ingredient.warning
+                    ? "danger"
+                    : ingredient.needReplacement
+                      ? "needReplacement"
+                      : ingredient.replacement
+                        ? "replacement"
+                        : "safe"
                 }
               />
             </div>
@@ -143,6 +170,13 @@ function IngredientPanel({ isComplete, ingredients }) {
               <p className="text-button-xs">
                 <Icon name="alert" size={12} />
                 {ingredient.warning}
+                {ingredient.needReplacement ? ` + ${ingredient.needReplacement}` : ""}
+              </p>
+            )}
+            {ingredient.needReplacement && !ingredient.warning && (
+              <p className={cn("need-replacement-copy text-button-xs")}>
+                <Icon name="alert" size={12} />
+                {ingredient.needReplacement}
               </p>
             )}
             {ingredient.replacement && (
@@ -166,7 +200,7 @@ function IngredientPanel({ isComplete, ingredients }) {
 function AnalysisPanel({
   analysisState,
   progress,
-  riskyIngredients,
+  mismatchedIngredients,
   onStart,
   onCompare,
   onMoreInfo,
@@ -243,14 +277,14 @@ function AnalysisPanel({
     );
   }
 
-  if (riskyIngredients.length === 0) {
+  if (mismatchedIngredients.length === 0) {
     return (
       <section className={cn("complete-card")}>
         <div className={cn("complete-card__title")}>
           <Icon name="shield" size={25} />
           <div>
-            <h2>현재 알레르기 조건에서 안전한 레시피예요</h2>
-            <p className="text-xs">등록된 알레르기와 일치하는 재료가 발견되지 않았어요.</p>
+            <h2>현재 조건에서 안전한 레시피예요</h2>
+            <p className="text-xs">알레르기·비건 조건과 맞지 않는 재료가 발견되지 않았어요.</p>
           </div>
         </div>
       </section>
@@ -264,15 +298,26 @@ function AnalysisPanel({
           <Icon name="alert" size={25} />
         </span>
         <div>
-          <h2>{riskyIngredients.length}개 재료가 내 알레르기 조건과 맞지 않아요</h2>
-          <p className="text-xs">알레르기 반응에 주의가 필요한 재료가 있어요.</p>
+          <h2>{mismatchedIngredients.length}개 재료가 내 조건과 맞지 않아요</h2>
+          <p className="text-xs">알레르기·비건 조건에 주의가 필요한 재료가 있어요.</p>
         </div>
       </div>
-      {riskyIngredients.map(ingredient => (
-        <span className={cn("danger-chip text-button-xs")} key={ingredient.id ?? ingredient.name}>
-          <Icon name="alert" size={12} />
-          {ingredient.name} - {ingredient.warning}
-        </span>
+      {mismatchedIngredients.map(ingredient => (
+        <div className={cn("mismatch-card__notices")} key={ingredient.id ?? ingredient.name}>
+          {ingredient.warning && (
+            <span className={cn("danger-chip text-button-xs")}>
+              <Icon name="alert" size={12} />
+              {ingredient.name} - {ingredient.warning}
+              {ingredient.needReplacement ? ` + ${ingredient.needReplacement}` : ""}
+            </span>
+          )}
+          {ingredient.needReplacement && !ingredient.warning && (
+            <span className={cn("warning-chip text-button-xs")}>
+              <Icon name="alert" size={12} />
+              {ingredient.name} - {ingredient.needReplacement}
+            </span>
+          )}
+        </div>
       ))}
       <div className={cn("mismatch-card__actions")}>
         <button className={cn("primary-button text-button-s")} type="button" onClick={onStart}>
@@ -353,11 +398,13 @@ function RecipeDetailPage() {
   const [appliedAllergies, setAppliedAllergies] = useState([]);
   const [appliedAllergenIds, setAppliedAllergenIds] = useState([]);
   const [appliedVeganType, setAppliedVeganType] = useState("");
+  const [appliedVeganTypeId, setAppliedVeganTypeId] = useState(null);
   const [draftAllergies, setDraftAllergies] = useState([]);
   const [draftVeganType, setDraftVeganType] = useState("");
   const [allergyOptions, setAllergyOptions] = useState([]);
   const [allergenCategoryMappings, setAllergenCategoryMappings] = useState([]);
   const [veganOptions, setVeganOptions] = useState([]);
+  const [veganTypeRestrictions, setVeganTypeRestrictions] = useState([]);
   const [conditionOptionsError, setConditionOptionsError] = useState("");
   const [isConditionDataLoading, setIsConditionDataLoading] = useState(true);
   const [isUserConditionsLoading, setIsUserConditionsLoading] = useState(true);
@@ -382,13 +429,21 @@ function RecipeDetailPage() {
         allergenCategoryMappings,
         allergyOptions,
       );
+      const veganRestricted = isRestrictedForVeganType(
+        ingredient,
+        appliedVeganTypeId,
+        veganTypeRestrictions,
+      );
 
       return {
         ...ingredient,
         warning: matchedAllergy ? `${matchedAllergy} 알레르기 위험` : undefined,
+        needReplacement: veganRestricted ? `${appliedVeganType} 부적합` : undefined,
       };
     });
-  const riskyIngredients = ingredients.filter(ingredient => ingredient.warning);
+  const mismatchedIngredients = ingredients.filter(
+    ingredient => ingredient.warning || ingredient.needReplacement,
+  );
   const steps = (recipe?.recipe_steps ?? [])
     .filter(step => step.step_type === "detail")
     .sort((a, b) => a.step_number - b.step_number)
@@ -498,14 +553,20 @@ function RecipeDetailPage() {
 
     async function loadConditionOptions() {
       setIsConditionDataLoading(true);
-      const [allergensResult, veganTypesResult, mappingsResult] = await Promise.all([
+      const [allergensResult, veganTypesResult, mappingsResult, restrictionsResult] =
+        await Promise.all([
         supabase.from("allergens").select("id, name").order("name"),
         supabase.from("vegan_types").select("id, name, description").order("name"),
         supabase.from("allergen_category_mappings").select("*"),
+        supabase.from("vegan_type_restrictions").select("*"),
       ]);
 
       if (!isActive) return;
-      const error = allergensResult.error ?? veganTypesResult.error ?? mappingsResult.error;
+      const error =
+        allergensResult.error ??
+        veganTypesResult.error ??
+        mappingsResult.error ??
+        restrictionsResult.error;
       if (error) {
         console.error("[HankkiLab] Condition options error:", error);
         setConditionOptionsError("조건 목록을 불러오지 못했습니다.");
@@ -516,6 +577,7 @@ function RecipeDetailPage() {
       setAllergyOptions(allergensResult.data ?? []);
       setVeganOptions(veganTypesResult.data ?? []);
       setAllergenCategoryMappings(mappingsResult.data ?? []);
+      setVeganTypeRestrictions(restrictionsResult.data ?? []);
       setConditionOptionsError("");
       setIsConditionDataLoading(false);
     }
@@ -548,6 +610,7 @@ function RecipeDetailPage() {
         setAppliedAllergies([]);
         setAppliedAllergenIds([]);
         setAppliedVeganType("");
+        setAppliedVeganTypeId(null);
         setDraftAllergies([]);
         setDraftVeganType("");
         setIsUserConditionsLoading(false);
@@ -603,6 +666,7 @@ function RecipeDetailPage() {
       setAppliedAllergies(allergies);
       setAppliedAllergenIds(allergenIds);
       setAppliedVeganType(veganType);
+      setAppliedVeganTypeId(profileResult.data?.vegan_type_id ?? null);
       setDraftAllergies(allergies);
       setDraftVeganType(veganType);
       setIsUserConditionsLoading(false);
@@ -714,6 +778,9 @@ function RecipeDetailPage() {
         .map(allergy => allergy.id),
     );
     setAppliedVeganType(draftVeganType);
+    setAppliedVeganTypeId(
+      veganOptions.find(veganType => veganType.name === draftVeganType)?.id ?? null,
+    );
     setAnalysisProgress(0);
     setAnalysisState("before");
     setIsConditionModalOpen(false);
@@ -825,7 +892,7 @@ function RecipeDetailPage() {
             <AnalysisPanel
               analysisState={analysisState}
               progress={analysisProgress}
-              riskyIngredients={riskyIngredients}
+              mismatchedIngredients={mismatchedIngredients}
               onStart={startAnalysis}
               onCompare={showOriginalRecipe}
               onMoreInfo={() => setIsMoreInfoOpen(true)}
