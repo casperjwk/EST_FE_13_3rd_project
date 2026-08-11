@@ -28,6 +28,19 @@ const suggestedQuestions = [
   "보관 방법이 궁금해요",
 ];
 
+function findMatchedAllergy(ingredient, allergenIds, categoryMappings, allergyOptions) {
+  const matchedMapping = categoryMappings.find(
+    mapping =>
+      allergenIds.some(allergenId => String(allergenId) === String(mapping.allergen_id)) &&
+      String(mapping.category_id ?? mapping.food_category_id) === String(ingredient.categoryId),
+  );
+
+  if (!matchedMapping) return undefined;
+  return allergyOptions.find(
+    allergy => String(allergy.id) === String(matchedMapping.allergen_id),
+  )?.name;
+}
+
 function Icon({ name, size = 18 }) {
   const materialIconNames = {
     user: "person",
@@ -150,7 +163,14 @@ function IngredientPanel({ isComplete, ingredients }) {
   );
 }
 
-function AnalysisPanel({ analysisState, progress, onStart, onCompare, onMoreInfo }) {
+function AnalysisPanel({
+  analysisState,
+  progress,
+  riskyIngredients,
+  onStart,
+  onCompare,
+  onMoreInfo,
+}) {
   if (analysisState === "analyzing") {
     const completedCount = Math.min(Math.floor(progress / 25), analysisSteps.length);
     return (
@@ -223,6 +243,20 @@ function AnalysisPanel({ analysisState, progress, onStart, onCompare, onMoreInfo
     );
   }
 
+  if (riskyIngredients.length === 0) {
+    return (
+      <section className={cn("complete-card")}>
+        <div className={cn("complete-card__title")}>
+          <Icon name="shield" size={25} />
+          <div>
+            <h2>현재 알레르기 조건에서 안전한 레시피예요</h2>
+            <p className="text-xs">등록된 알레르기와 일치하는 재료가 발견되지 않았어요.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className={cn("mismatch-card")}>
       <div className={cn("mismatch-card__title")}>
@@ -230,14 +264,16 @@ function AnalysisPanel({ analysisState, progress, onStart, onCompare, onMoreInfo
           <Icon name="alert" size={25} />
         </span>
         <div>
-          <h2>1개 재료가 내 조건과 맞지 않아요</h2>
-          <p className="text-xs">알레르기 · 비건 식단에 주의가 필요한 재료가 있어요</p>
+          <h2>{riskyIngredients.length}개 재료가 내 알레르기 조건과 맞지 않아요</h2>
+          <p className="text-xs">알레르기 반응에 주의가 필요한 재료가 있어요.</p>
         </div>
       </div>
-      <span className={cn("danger-chip text-button-xs")}>
-        <Icon name="alert" size={12} />
-        돼지고기 앞다리살 - 돼지고기 알레르기 + 페스코 미적합
-      </span>
+      {riskyIngredients.map(ingredient => (
+        <span className={cn("danger-chip text-button-xs")} key={ingredient.id ?? ingredient.name}>
+          <Icon name="alert" size={12} />
+          {ingredient.name} - {ingredient.warning}
+        </span>
+      ))}
       <div className={cn("mismatch-card__actions")}>
         <button className={cn("primary-button text-button-s")} type="button" onClick={onStart}>
           <Icon name="shield" size={15} />
@@ -314,13 +350,17 @@ function RecipeDetailPage() {
   const [simpleRecipeStep, setSimpleRecipeStep] = useState(0);
   const [isConditionModalOpen, setIsConditionModalOpen] = useState(false);
   const [isMoreInfoOpen, setIsMoreInfoOpen] = useState(false);
-  const [appliedAllergies, setAppliedAllergies] = useState(["돼지고기"]);
-  const [appliedVeganType, setAppliedVeganType] = useState("페스코");
-  const [draftAllergies, setDraftAllergies] = useState(["돼지고기"]);
-  const [draftVeganType, setDraftVeganType] = useState("페스코");
+  const [appliedAllergies, setAppliedAllergies] = useState([]);
+  const [appliedAllergenIds, setAppliedAllergenIds] = useState([]);
+  const [appliedVeganType, setAppliedVeganType] = useState("");
+  const [draftAllergies, setDraftAllergies] = useState([]);
+  const [draftVeganType, setDraftVeganType] = useState("");
   const [allergyOptions, setAllergyOptions] = useState([]);
+  const [allergenCategoryMappings, setAllergenCategoryMappings] = useState([]);
   const [veganOptions, setVeganOptions] = useState([]);
   const [conditionOptionsError, setConditionOptionsError] = useState("");
+  const [isConditionDataLoading, setIsConditionDataLoading] = useState(true);
+  const [isUserConditionsLoading, setIsUserConditionsLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [recipeQuestion, setRecipeQuestion] = useState("");
   const [questionMessages, setQuestionMessages] = useState([]);
@@ -329,16 +369,26 @@ function RecipeDetailPage() {
   const ingredients = (recipe?.recipe_ingredients ?? [])
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map(item => ({
-      id: item.ingredients.id,
-      name: item.ingredients.name,
-      amount: item.amount,
-      categoryId: item.ingredients.category_id,
-      warning:
-        item.ingredients.category_id === "pork"
-          ? "돼지고기 알레르기 위험 + 페스코 미적합"
-          : undefined,
-    }));
+    .map(item => {
+      const ingredient = {
+        id: item.ingredients.id,
+        name: item.ingredients.name,
+        amount: item.amount,
+        categoryId: item.ingredients.category_id,
+      };
+      const matchedAllergy = findMatchedAllergy(
+        ingredient,
+        appliedAllergenIds,
+        allergenCategoryMappings,
+        allergyOptions,
+      );
+
+      return {
+        ...ingredient,
+        warning: matchedAllergy ? `${matchedAllergy} 알레르기 위험` : undefined,
+      };
+    });
+  const riskyIngredients = ingredients.filter(ingredient => ingredient.warning);
   const steps = (recipe?.recipe_steps ?? [])
     .filter(step => step.step_type === "detail")
     .sort((a, b) => a.step_number - b.step_number)
@@ -447,25 +497,118 @@ function RecipeDetailPage() {
     let isActive = true;
 
     async function loadConditionOptions() {
-      const [allergensResult, veganTypesResult] = await Promise.all([
+      setIsConditionDataLoading(true);
+      const [allergensResult, veganTypesResult, mappingsResult] = await Promise.all([
         supabase.from("allergens").select("id, name").order("name"),
         supabase.from("vegan_types").select("id, name, description").order("name"),
+        supabase.from("allergen_category_mappings").select("*"),
       ]);
 
       if (!isActive) return;
-      const error = allergensResult.error ?? veganTypesResult.error;
+      const error = allergensResult.error ?? veganTypesResult.error ?? mappingsResult.error;
       if (error) {
         console.error("[HankkiLab] Condition options error:", error);
         setConditionOptionsError("조건 목록을 불러오지 못했습니다.");
+        setIsConditionDataLoading(false);
         return;
       }
 
       setAllergyOptions(allergensResult.data ?? []);
       setVeganOptions(veganTypesResult.data ?? []);
+      setAllergenCategoryMappings(mappingsResult.data ?? []);
       setConditionOptionsError("");
+      setIsConditionDataLoading(false);
     }
 
     loadConditionOptions();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadUserConditions() {
+      setIsUserConditionsLoading(true);
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (!isActive) return;
+      if (sessionError) {
+        console.error("[HankkiLab] User condition session error:", sessionError);
+        setIsUserConditionsLoading(false);
+        return;
+      }
+
+      if (!session?.user) {
+        setAppliedAllergies([]);
+        setAppliedAllergenIds([]);
+        setAppliedVeganType("");
+        setDraftAllergies([]);
+        setDraftVeganType("");
+        setIsUserConditionsLoading(false);
+        return;
+      }
+
+      const [profileResult, allergyResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("vegan_type_id")
+          .eq("id", session.user.id)
+          .maybeSingle(),
+        supabase
+          .from("user_allergies")
+          .select("allergen_id, allergens(name)")
+          .eq("user_id", session.user.id),
+      ]);
+
+      if (!isActive) return;
+      if (profileResult.error || allergyResult.error) {
+        console.error("[HankkiLab] User conditions error:", {
+          profileError: profileResult.error,
+          allergyError: allergyResult.error,
+        });
+        setIsUserConditionsLoading(false);
+        return;
+      }
+
+      const allergies = (allergyResult.data ?? [])
+        .map(item => {
+          const allergen = Array.isArray(item.allergens) ? item.allergens[0] : item.allergens;
+          return allergen?.name;
+        })
+        .filter(name => typeof name === "string");
+      const allergenIds = (allergyResult.data ?? []).map(item => item.allergen_id);
+
+      let veganType = "";
+      if (profileResult.data?.vegan_type_id != null) {
+        const { data: veganTypeData, error: veganTypeError } = await supabase
+          .from("vegan_types")
+          .select("name")
+          .eq("id", profileResult.data.vegan_type_id)
+          .maybeSingle();
+
+        if (!isActive) return;
+        if (veganTypeError) {
+          console.error("[HankkiLab] User vegan type error:", veganTypeError);
+        } else {
+          veganType = veganTypeData?.name ?? "";
+        }
+      }
+
+      setAppliedAllergies(allergies);
+      setAppliedAllergenIds(allergenIds);
+      setAppliedVeganType(veganType);
+      setDraftAllergies(allergies);
+      setDraftVeganType(veganType);
+      setIsUserConditionsLoading(false);
+    }
+
+    loadUserConditions();
     return () => {
       isActive = false;
     };
@@ -546,9 +689,15 @@ function RecipeDetailPage() {
   const closeSimpleRecipe = () => setIsSimpleRecipeOpen(false);
 
   const openConditionModal = () => {
-    setDraftAllergies(appliedAllergies);
+    setDraftAllergies([...appliedAllergies]);
     setDraftVeganType(appliedVeganType);
     setIsConditionModalOpen(true);
+  };
+
+  const closeConditionModal = () => {
+    setDraftAllergies([...appliedAllergies]);
+    setDraftVeganType(appliedVeganType);
+    setIsConditionModalOpen(false);
   };
 
   const toggleAllergy = allergy => {
@@ -558,8 +707,15 @@ function RecipeDetailPage() {
   };
 
   const applyConditions = () => {
-    setAppliedAllergies(draftAllergies);
+    setAppliedAllergies([...draftAllergies]);
+    setAppliedAllergenIds(
+      allergyOptions
+        .filter(allergy => draftAllergies.includes(allergy.name))
+        .map(allergy => allergy.id),
+    );
     setAppliedVeganType(draftVeganType);
+    setAnalysisProgress(0);
+    setAnalysisState("before");
     setIsConditionModalOpen(false);
   };
 
@@ -627,7 +783,7 @@ function RecipeDetailPage() {
     setIsQuestionLoading(false);
   };
 
-  if (isRecipeLoading) {
+  if (isRecipeLoading || isUserConditionsLoading || isConditionDataLoading) {
     return <RecipeDetailSkeleton />;
   }
 
@@ -669,6 +825,7 @@ function RecipeDetailPage() {
             <AnalysisPanel
               analysisState={analysisState}
               progress={analysisProgress}
+              riskyIngredients={riskyIngredients}
               onStart={startAnalysis}
               onCompare={showOriginalRecipe}
               onMoreInfo={() => setIsMoreInfoOpen(true)}
@@ -955,7 +1112,7 @@ function RecipeDetailPage() {
           className={cn("condition-modal-backdrop")}
           role="presentation"
           onMouseDown={event => {
-            if (event.target === event.currentTarget) setIsConditionModalOpen(false);
+            if (event.target === event.currentTarget) closeConditionModal();
           }}
         >
           <section
@@ -974,7 +1131,7 @@ function RecipeDetailPage() {
                   className={cn("condition-modal__close")}
                   type="button"
                   aria-label="조건 수정 닫기"
-                  onClick={() => setIsConditionModalOpen(false)}
+                  onClick={closeConditionModal}
                 >
                   <span className="material-symbols-outlined" aria-hidden="true">
                     close
