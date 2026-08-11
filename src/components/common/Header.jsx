@@ -6,6 +6,7 @@ import styles from './common.module.css';
 
 function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
   const isLoggedIn = !!user;
 
@@ -14,6 +15,7 @@ function Header() {
   const handleLogout = () => {
     signOut();
     closeMenu();
+    setProfileMenuOpen(false);
   };
 
   return (
@@ -31,11 +33,41 @@ function Header() {
 
         <div className={styles['common-header__auth-area']}>
           {isLoggedIn ? (
-            <Link to="/mypage" className={styles['common-header__profile']}>
-              <div className={styles['common-header__profile-circle']}></div>
-              <span className="text-s">{user.user_metadata?.nickname}</span>
-              <span className={`material-symbols-outlined ${styles['common-header__profile-arrow']}`}>expand_more</span>
-            </Link>
+            <div className={styles['common-header__profile-wrap']}>
+              <button
+                className={styles['common-header__profile']}
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+              >
+                <div className={styles['common-header__profile-circle']}></div>
+                <span className="text-s">{user.user_metadata?.nickname}</span>
+                <span className={`material-symbols-outlined ${styles['common-header__profile-arrow']}`}>expand_more</span>
+              </button>
+
+              {profileMenuOpen && (
+                <div className={styles['common-header__profile-dropdown']}>
+                  <Link
+                    to="/mypage"
+                    className={`${styles['common-header__profile-dropdown-link']} text-s`}
+                    onClick={() => setProfileMenuOpen(false)}
+                  >
+                    마이페이지
+                  </Link>
+                  <Link
+                    to="/favorite"
+                    className={`${styles['common-header__profile-dropdown-link']} text-s`}
+                    onClick={() => setProfileMenuOpen(false)}
+                  >
+                    즐겨찾기
+                  </Link>
+                  <button
+                    className={`${styles['common-header__profile-dropdown-logout']} text-s`}
+                    onClick={handleLogout}
+                  >
+                    로그아웃
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <Link to="/login" className={`${styles['common-header__login-btn']} text-button-s`}>로그인</Link>

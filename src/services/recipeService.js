@@ -142,3 +142,80 @@ export async function createRecipe(recipe, imageFile = null) {
     throw error;
   }
 }
+
+export async function getPopularRecipes(limit = 4) {
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("id, title, description, image_url, servings, cooking_time, difficulty")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("[HankkiLab] getPopularRecipes error:", error);
+    return [];
+  }
+  return data;
+}
+
+export async function getRecipesByIds(recipeIds) {
+  if (!recipeIds || recipeIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("recipes")
+    .select(`
+      id, title, description, image_url, difficulty, cooking_time, servings,
+      recipe_ingredients ( amount, ingredients ( id, name, category_id ) )
+    `)
+    .in("id", recipeIds);
+
+  if (error) {
+    console.error("[HankkiLab] getRecipesByIds error:", error);
+    return [];
+  }
+  return data;
+}
+export async function getRecipesByVeganType(veganTypeId, limit = 3) {
+  // "전체" (필터 없음)
+  if (!veganTypeId) {
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("id, title, description, image_url, difficulty, cooking_time, servings")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) {
+      console.error("[HankkiLab] getRecipesByVeganType error:", error);
+      return [];
+    }
+    return data;
+  }
+
+  const { data: restrictions, error: restrictionError } = await supabase
+    .from("vegan_type_restrictions")
+    .select("*")
+    .eq("vegan_type_id", veganTypeId);
+  if (restrictionError) {
+    console.error("[HankkiLab] vegan_type_restrictions error:", restrictionError);
+    return [];
+  }
+  const restrictedCategoryIds = (restrictions ?? []).map(r =>
+    String(r.category_id ?? r.food_category_id),
+  );
+
+  const { data: recipes, error } = await supabase.from("recipes").select(`
+    id, title, description, image_url, difficulty, cooking_time, servings,
+    recipe_ingredients ( ingredients ( category_id ) )
+  `);
+  if (error) {
+    console.error("[HankkiLab] getRecipesByVeganType error:", error);
+    return [];
+  }
+
+  const compatible = (recipes ?? []).filter(recipe => {
+    const categoryIds = (recipe.recipe_ingredients ?? []).map(ri =>
+      String(ri.ingredients.category_id),
+    );
+    return !categoryIds.some(id => restrictedCategoryIds.includes(id));
+  });
+
+  return compatible.slice(0, limit);
+}
