@@ -95,11 +95,17 @@
   text-decoration: none;
 }
 
+.common-header__profile-wrap {
+  position: relative;
+}
+
 .common-header__profile {
   display: flex;
   align-items: center;
   gap: 8px;
-  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
   color: var(--black-1);
 }
 
@@ -113,6 +119,36 @@
   height: 32px;
   border-radius: 50%;
   background: var(--gray-1);
+}
+
+.common-header__profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--gray-1);
+  border-radius: 8px;
+  background: var(--white-1);
+  z-index: 10;
+}
+
+.common-header__profile-dropdown-link {
+  color: var(--black-1);
+  text-decoration: none;
+  padding: 6px 4px;
+}
+.common-header__profile-dropdown-link:hover {
+  color: var(--primary);
+}
+
+.common-header__profile-dropdown-logout {
+  color: var(--danger);
+  text-align: left;
+  padding: 6px 4px;
 }
 
 .common-header__hamburger-btn {
