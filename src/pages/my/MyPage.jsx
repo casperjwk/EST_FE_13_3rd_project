@@ -11,12 +11,7 @@ import styles from "./MyPage.module.css";
 // 즐겨찾기 개수는 아직 실제 집계 로직 없어서 목업 유지
 const MOCK_FAVORITE_COUNT = 12;
 
-// 수정상태(미선택 버전) 목업 데이터 - allergies를 채우면 "선택됨" 모습도 확인 가능
-const dietDraft = {
-  allergies: [],
-  veganType: "일반",
-};
-
+// DB(vegan_types 테이블)의 id와 맞춰야 저장이 정상 동작함
 const veganTypes = [
   { id: "general", label: "일반", desc: "제한 없음" },
   {
@@ -34,7 +29,7 @@ const veganTypes = [
     descBreak: ["생선·해산물까지 ", "허용"],
     descBreakFrom: "desktop",
   },
-  { id: "lacto-ovo", label: "락토-오보", desc: "유제품·달걀 허용" },
+  { id: "lacto_ovo", label: "락토-오보", desc: "유제품·달걀 허용" },
   { id: "lacto", label: "락토", desc: "유제품만 허용" },
   { id: "ovo", label: "오보", desc: "달걀만 허용" },
   {
@@ -45,6 +40,8 @@ const veganTypes = [
     descBreakFrom: "desktop",
   },
 ];
+
+const DEFAULT_VEGAN_TYPE_ID = "general";
 
 const difficultyStyles = {
   easy: "recentDifficultyEasy",
@@ -60,17 +57,24 @@ const difficultyLabels = {
 
 function MyPage() {
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
+  const { user: authUser, loading: authLoading } = useAuth();
   const [photoUrl, setPhotoUrl] = useState(null);
   const [allergyOptions, setAllergyOptions] = useState([]);
-  const [selectedAllergies, setSelectedAllergies] = useState(dietDraft.allergies);
-  const [selectedVeganType, setSelectedVeganType] = useState(dietDraft.veganType);
+  const [selectedAllergies, setSelectedAllergies] = useState([]);
+  const [selectedVeganType, setSelectedVeganType] = useState(DEFAULT_VEGAN_TYPE_ID);
   const [favoriteRecentIds, setFavoriteRecentIds] = useState(() => new Set());
   const [recentRecipes, setRecentRecipes] = useState([]);
   const [nickname, setNickname] = useState("");
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isDietLoading, setIsDietLoading] = useState(true);
+  const [isEditingDiet, setIsEditingDiet] = useState(false);
+  const [isSavingDiet, setIsSavingDiet] = useState(false);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
     if (!authUser) {
       setNickname("");
       setIsProfileLoading(false);
@@ -100,7 +104,51 @@ function MyPage() {
     return () => {
       isActive = false;
     };
-  }, [authUser]);
+  }, [authUser, authLoading]);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!authUser) {
+      setSelectedAllergies([]);
+      setSelectedVeganType(DEFAULT_VEGAN_TYPE_ID);
+      setIsDietLoading(false);
+      return;
+    }
+
+    let isActive = true;
+    setIsDietLoading(true);
+
+    async function loadDiet() {
+      const [{ data: profileData, error: profileError }, { data: allergyRows, error: allergyError }] =
+        await Promise.all([
+          supabase.from("profiles").select("vegan_type_id").eq("id", authUser.id).maybeSingle(),
+          supabase.from("user_allergies").select("allergen_id").eq("user_id", authUser.id),
+        ]);
+      if (!isActive) return;
+
+      if (profileError) {
+        console.error("[MyPage] vegan_type_id fetch error:", profileError);
+      } else {
+        setSelectedVeganType(profileData?.vegan_type_id ?? DEFAULT_VEGAN_TYPE_ID);
+      }
+
+      if (allergyError) {
+        console.error("[MyPage] user_allergies fetch error:", allergyError);
+      } else {
+        setSelectedAllergies(allergyRows.map(row => row.allergen_id));
+      }
+
+      setIsDietLoading(false);
+    }
+
+    loadDiet();
+    return () => {
+      isActive = false;
+    };
+  }, [authUser, authLoading]);
 
   useEffect(() => {
     let isActive = true;
@@ -112,7 +160,7 @@ function MyPage() {
         console.error("[MyPage] allergens fetch error:", error);
         return;
       }
-      setAllergyOptions(data.map(allergen => allergen.name));
+      setAllergyOptions(data);
     }
 
     loadAllergens();
@@ -123,6 +171,10 @@ function MyPage() {
 
   useEffect(() => {
     async function loadRecentlyViewed() {
+      if (authLoading) {
+        return;
+      }
+
       if (!authUser) {
         setRecentRecipes([]);
         return;
@@ -147,7 +199,7 @@ function MyPage() {
     }
 
     loadRecentlyViewed();
-  }, [authUser]);
+  }, [authUser, authLoading]);
 
   const goToRecipeDetail = id => {
     navigate(`/recipes/${id}`);
@@ -172,10 +224,62 @@ function MyPage() {
     setPhotoUrl(URL.createObjectURL(file));
   };
 
-  const toggleAllergy = allergy => {
+  const toggleAllergy = allergenId => {
     setSelectedAllergies(prev =>
-      prev.includes(allergy) ? prev.filter(item => item !== allergy) : [...prev, allergy],
+      prev.includes(allergenId) ? prev.filter(item => item !== allergenId) : [...prev, allergenId],
     );
+  };
+
+  const startEditingDiet = () => {
+    setIsEditingDiet(true);
+  };
+
+  const cancelEditingDiet = async () => {
+    if (!authUser) {
+      setIsEditingDiet(false);
+      return;
+    }
+
+    const [{ data: profileData }, { data: allergyRows }] = await Promise.all([
+      supabase.from("profiles").select("vegan_type_id").eq("id", authUser.id).maybeSingle(),
+      supabase.from("user_allergies").select("allergen_id").eq("user_id", authUser.id),
+    ]);
+    setSelectedVeganType(profileData?.vegan_type_id ?? DEFAULT_VEGAN_TYPE_ID);
+    setSelectedAllergies((allergyRows ?? []).map(row => row.allergen_id));
+    setIsEditingDiet(false);
+  };
+
+  const saveDiet = async () => {
+    if (!authUser || isSavingDiet) return;
+
+    setIsSavingDiet(true);
+    try {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ vegan_type_id: selectedVeganType })
+        .eq("id", authUser.id);
+      if (profileError) throw profileError;
+
+      const { error: deleteError } = await supabase
+        .from("user_allergies")
+        .delete()
+        .eq("user_id", authUser.id);
+      if (deleteError) throw deleteError;
+
+      if (selectedAllergies.length > 0) {
+        const { error: insertError } = await supabase.from("user_allergies").insert(
+          selectedAllergies.map(allergenId => ({ user_id: authUser.id, allergen_id: allergenId })),
+        );
+        if (insertError) throw insertError;
+      }
+
+      setIsEditingDiet(false);
+    } catch (error) {
+      console.error("[MyPage] 식단 정보 저장 실패", error);
+      alert("식단 정보를 저장하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsSavingDiet(false);
+    }
   };
 
   const recentScrollRef = useRef(null);
@@ -245,112 +349,179 @@ function MyPage() {
           </div>
         </section>
 
+        {!isDietLoading && (
         <section className={styles.dietCard}>
           <div className={styles.dietCardHeader}>
             <h3 className={styles.dietCardTitle}>식단 정보</h3>
-            <div className={styles.dietEditActions}>
-              <button type="button" className={styles.dietCancelBtn}>
-                <span className="material-icons" aria-hidden="true">
-                  close
-                </span>
-                취소
-              </button>
-              <button type="button" className={styles.dietSaveBtn}>
-                <span className="material-icons" aria-hidden="true">
-                  save
-                </span>
-                저장
-              </button>
-            </div>
-          </div>
-
-          <div className={styles.dietRow}>
-            <p className={styles.dietLabel}>
-              <span className={`material-icons ${styles.dietLabelIconWarning}`} aria-hidden="true">
-                warning_amber
-              </span>
-              알레르기 정보
-            </p>
-            <p className={`${styles.dietDescription} ${styles.allergyDescription}`}>
-              해당하는 알레르기를 모두 선택해주세요. 레시피 검색 시 자동으로 적용됩니다.
-            </p>
-            <div className={styles.allergyChipGrid}>
-              {allergyOptions.map(allergy => (
+            {isEditingDiet ? (
+              <div className={styles.dietEditActions}>
                 <button
-                  key={allergy}
                   type="button"
-                  onClick={() => toggleAllergy(allergy)}
-                  className={`${styles.allergyChip} ${
-                    selectedAllergies.includes(allergy) ? styles.allergyChipSelected : ""
-                  }`}
+                  className={styles.dietCancelBtn}
+                  onClick={cancelEditingDiet}
+                  disabled={isSavingDiet}
                 >
-                  {allergy}
+                  <span className="material-icons" aria-hidden="true">
+                    close
+                  </span>
+                  취소
                 </button>
-              ))}
-            </div>
-            {selectedAllergies.length === 0 && (
-              <p className={styles.dietNoticeText}>선택한 알레르기가 없습니다.</p>
+                <button
+                  type="button"
+                  className={styles.dietSaveBtn}
+                  onClick={saveDiet}
+                  disabled={isSavingDiet}
+                >
+                  <span className="material-icons" aria-hidden="true">
+                    save
+                  </span>
+                  {isSavingDiet ? "저장 중..." : "저장"}
+                </button>
+              </div>
+            ) : (
+              <button type="button" className={styles.dietEditBtn} onClick={startEditingDiet}>
+                <span className="material-icons" aria-hidden="true">
+                  edit
+                </span>
+                수정
+              </button>
             )}
           </div>
 
-          <div className={styles.dietRow}>
-            <p className={styles.dietLabel}>
-              <span className={`material-icons ${styles.dietLabelIconEco}`} aria-hidden="true">
-                spa
-              </span>
-              비건 유형
-            </p>
-            <p className={styles.dietDescription}>
-              비건 유형은 알레르기와 별개 기준입니다. 가장 가까운 식단 유형을 선택하세요.
-            </p>
-            <div className={styles.veganCardGrid}>
-              {veganTypes.map(type => (
-                <label key={type.id} className={styles.veganCard}>
-                  <input
-                    type="radio"
-                    name="veganType"
-                    className={styles.veganCardRadio}
-                    checked={type.label === selectedVeganType}
-                    onChange={() => setSelectedVeganType(type.label)}
-                  />
-                  <span className={styles.veganCardText}>
-                    <span className={styles.veganCardLabel}>{type.label}</span>
-                    <span className={styles.veganCardDesc}>
-                      {type.descBreak ? (
-                        <>
-                          {type.descBreak[0]}
-                          <br
-                            className={
-                              type.descBreakFrom === "desktop"
-                                ? styles.veganCardBreakDesktop
-                                : styles.veganCardBreak
-                            }
-                          />
-                          {type.descBreak[1]}
-                        </>
-                      ) : (
-                        type.desc
-                      )}
-                    </span>
+          {isEditingDiet ? (
+            <>
+              <div className={styles.dietRow}>
+                <p className={styles.dietLabel}>
+                  <span className={`material-icons ${styles.dietLabelIconWarning}`} aria-hidden="true">
+                    warning_amber
                   </span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </section>
+                  알레르기 정보
+                </p>
+                <p className={`${styles.dietDescription} ${styles.allergyDescription}`}>
+                  해당하는 알레르기를 모두 선택해주세요. 레시피 검색 시 자동으로 적용됩니다.
+                </p>
+                <div className={styles.allergyChipGrid}>
+                  {allergyOptions.map(allergy => (
+                    <button
+                      key={allergy.id}
+                      type="button"
+                      onClick={() => toggleAllergy(allergy.id)}
+                      className={`${styles.allergyChip} ${
+                        selectedAllergies.includes(allergy.id) ? styles.allergyChipSelected : ""
+                      }`}
+                    >
+                      {allergy.name}
+                    </button>
+                  ))}
+                </div>
+                {selectedAllergies.length === 0 && (
+                  <p className={styles.dietNoticeText}>선택한 알레르기가 없습니다.</p>
+                )}
+              </div>
 
+              <div className={styles.dietRow}>
+                <p className={styles.dietLabel}>
+                  <span className={`material-icons ${styles.dietLabelIconEco}`} aria-hidden="true">
+                    spa
+                  </span>
+                  비건 유형
+                </p>
+                <p className={styles.dietDescription}>
+                  비건 유형은 알레르기와 별개 기준입니다. 가장 가까운 식단 유형을 선택하세요.
+                </p>
+                <div className={styles.veganCardGrid}>
+                  {veganTypes.map(type => (
+                    <label key={type.id} className={styles.veganCard}>
+                      <input
+                        type="radio"
+                        name="veganType"
+                        className={styles.veganCardRadio}
+                        checked={type.id === selectedVeganType}
+                        onChange={() => setSelectedVeganType(type.id)}
+                      />
+                      <span className={styles.veganCardText}>
+                        <span className={styles.veganCardLabel}>{type.label}</span>
+                        <span className={styles.veganCardDesc}>
+                          {type.descBreak ? (
+                            <>
+                              {type.descBreak[0]}
+                              <br
+                                className={
+                                  type.descBreakFrom === "desktop"
+                                    ? styles.veganCardBreakDesktop
+                                    : styles.veganCardBreak
+                                }
+                              />
+                              {type.descBreak[1]}
+                            </>
+                          ) : (
+                            type.desc
+                          )}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={styles.dietRow}>
+                <p className={styles.dietLabel}>
+                  <span className={`material-icons ${styles.dietLabelIconWarning}`} aria-hidden="true">
+                    warning_amber
+                  </span>
+                  알레르기 정보
+                </p>
+                {selectedAllergies.length === 0 ? (
+                  <p className={`${styles.dietNoticeText} ${styles.dietViewValue}`}>
+                    등록된 알레르기 정보가 없어요.
+                  </p>
+                ) : (
+                  <div className={`${styles.dietChipList} ${styles.dietViewValue}`}>
+                    {selectedAllergies.map(allergenId => (
+                      <span key={allergenId} className={styles.dietChipDanger}>
+                        {allergyOptions.find(a => a.id === allergenId)?.name ?? allergenId}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.dietRow}>
+                <p className={styles.dietLabel}>
+                  <span className={`material-icons ${styles.dietLabelIconEco}`} aria-hidden="true">
+                    spa
+                  </span>
+                  비건 유형
+                </p>
+                <div className={`${styles.dietChipList} ${styles.dietViewValue}`}>
+                  <span className={styles.dietChipPrimary}>
+                    {veganTypes.find(type => type.id === selectedVeganType)?.label ?? "일반"}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+        )}
+
+        {!isDietLoading && isEditingDiet && (
         <section className={styles.appliedCard}>
           <h3 className={styles.appliedTitle}>현재 적용 중인 조건</h3>
           <p className={styles.dietDescription}>레시피 검색 시 자동으로 적용되는 조건이에요.</p>
           <div className={styles.dietChipList}>
-            {selectedAllergies.map(allergy => (
-              <span key={allergy} className={styles.dietChipDanger}>
-                {allergy} 제외
+            {selectedAllergies.map(allergenId => (
+              <span key={allergenId} className={styles.dietChipDanger}>
+                {allergyOptions.find(a => a.id === allergenId)?.name ?? allergenId} 제외
               </span>
             ))}
-            <span className={styles.dietChipPrimary}>{selectedVeganType}</span>
+            <span className={styles.dietChipPrimary}>
+              {veganTypes.find(type => type.id === selectedVeganType)?.label ?? "일반"}
+            </span>
           </div>
         </section>
+        )}
 
         {recentRecipes.length > 0 && (
         <section className={styles.recentCard}>

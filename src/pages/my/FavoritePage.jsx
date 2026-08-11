@@ -66,7 +66,7 @@ const statusConfig = {
 
 function FavoritePage() {
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
+  const { user: authUser, loading: authLoading } = useAuth();
   const [favoriteIds, setFavoriteIds] = useState(() => new Set());
   const [favoriteRecipes, setFavoriteRecipes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,6 +74,10 @@ function FavoritePage() {
 
   useEffect(() => {
     async function loadFavoriteRecipes() {
+      if (authLoading) {
+        return;
+      }
+
       if (!authUser) {
         setFavoriteRecipes([]);
         setIsLoading(false);
@@ -107,7 +111,7 @@ function FavoritePage() {
     }
 
     loadFavoriteRecipes();
-  }, [authUser]);
+  }, [authUser, authLoading]);
 
   const toggleFavorite = (id, event) => {
     event.stopPropagation();
