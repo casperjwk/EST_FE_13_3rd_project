@@ -142,3 +142,35 @@ export async function createRecipe(recipe, imageFile = null) {
     throw error;
   }
 }
+
+export async function getPopularRecipes(limit = 4) {
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("id, title, description, image_url, servings, cooking_time, difficulty")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("[HankkiLab] getPopularRecipes error:", error);
+    return [];
+  }
+  return data;
+}
+
+export async function getRecipesByIds(recipeIds) {
+  if (!recipeIds || recipeIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("recipes")
+    .select(`
+      id, title, description, image_url, difficulty, cooking_time, servings,
+      recipe_ingredients ( amount, ingredients ( id, name, category_id ) )
+    `)
+    .in("id", recipeIds);
+
+  if (error) {
+    console.error("[HankkiLab] getRecipesByIds error:", error);
+    return [];
+  }
+  return data;
+}
