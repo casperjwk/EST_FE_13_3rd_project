@@ -6,10 +6,15 @@
   gap: 8px;
   padding: 2px 10px;
   white-space: nowrap;
+  background: var(--white-1);
 }
 
 .common-badge--safe {
   color: var(--primary);
+}
+
+.common-badge--needReplacement {
+  color: var(--warning);
 }
 
 .common-badge--danger {

@@ -63,12 +63,7 @@
 
 .skeleton-block {
   display: block;
-  background: linear-gradient(
-    100deg,
-    var(--gray-1) 20%,
-    var(--white-2) 38%,
-    var(--gray-1) 56%
-  );
+  background: linear-gradient(100deg, var(--gray-1) 20%, var(--white-2) 38%, var(--gray-1) 56%);
   background-size: 220% 100%;
   animation: recipe-skeleton-loading 1.35s ease-in-out infinite;
 }
@@ -381,7 +376,8 @@
 }
 
 .condition-tag,
-.danger-chip {
+.danger-chip,
+.warning-chip {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -584,10 +580,26 @@
   color: var(--gray-3);
 }
 
+.mismatch-card__title p {
+  margin-bottom: 0;
+}
+
 .danger-chip {
   margin-top: 15px;
   margin-left: 34px;
   color: var(--danger);
+}
+
+.warning-chip {
+  margin-top: 15px;
+  margin-left: 34px;
+  color: var(--warning);
+}
+
+.mismatch-card__notices {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .mismatch-card__actions,
@@ -755,19 +767,18 @@
 
 .ingredient-card ul {
   display: grid;
-  gap: 20px;
+  gap: 15px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .ingredient {
-  padding: 5px 10px;
-  border-radius: 4px;
+  padding: 0;
 }
 
 .ingredient--warning {
-  background: transparent;
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
 }
 
 .ingredient__row {
@@ -775,6 +786,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 5px 10px;
+  border-radius: 4px;
 }
 
 .ingredient__row > div {
@@ -808,12 +821,20 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin: 8px 0 0;
+  margin: 8px 10px 0;
   color: var(--danger);
 }
 
 .ingredient > p.replacement-copy {
   color: var(--tag);
+}
+
+.ingredient > p.need-replacement-copy {
+  color: var(--warning);
+}
+
+.ingredient--replacement-needed {
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
 }
 
 .ingredient-note {
@@ -1828,7 +1849,7 @@
   }
 
   .steps-card li p {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .question-card {
@@ -1969,7 +1990,8 @@
   }
 
   .condition-tag,
-  .danger-chip {
+  .danger-chip,
+  .warning-chip {
     gap: 4px;
     padding: 4px 10px;
   }
@@ -2072,7 +2094,8 @@
     line-height: 1.5;
   }
 
-  .mismatch-card .danger-chip {
+  .mismatch-card .danger-chip,
+  .mismatch-card .warning-chip {
     margin-left: 44px;
   }
 
@@ -2104,15 +2127,17 @@
   }
 
   .ingredient-card ul {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
   }
 
   .ingredient {
-    padding: 11px 10px;
+    padding: 0;
   }
 
-  .ingredient--warning {
-    background: #f8e3e0;
+  .ingredient__row {
+    padding: 5px 10px;
   }
 
   .ingredient-note {

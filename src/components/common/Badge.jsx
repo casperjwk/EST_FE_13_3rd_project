@@ -5,6 +5,10 @@ const BADGE_TYPES = {
     icon: "check",
     label: "안전",
   },
+  needReplacement: {
+    icon: "refresh",
+    label: "대체 필요",
+  },
   danger: {
     icon: "warning_amber",
     label: "위험",
