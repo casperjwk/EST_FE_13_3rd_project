@@ -65,10 +65,10 @@ export default function SignupPage() {
       const user = authData?.user;
 
       if (user) {
-        // 2. profiles DB 테이블에 유저 정보 저장 (vegan_type_id 예외 처리 강화)
+        // 2. profiles DB 테이블에 유저 정보 저장 (upsert를 사용하여 중복 키 충돌 방지)
         const veganValue = finalData.veganType && finalData.veganType !== "none" ? finalData.veganType : null;
 
-        const { error: dbError } = await supabase.from("profiles").insert({
+        const { error: dbError } = await supabase.from("profiles").upsert({
           id: user.id,
           nickname: finalData.nickname || "사용자",
           vegan_type_id: veganValue,

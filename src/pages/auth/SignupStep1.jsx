@@ -41,34 +41,17 @@ export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
   const [nickname, setNickname] = useState(initialData.nickname || "");
   const [agree, setAgree] = useState(initialData.agree || false);
 
-  const [isEmailChecked, setIsEmailChecked] = useState(false); // 이메일 중복확인 여부
   const [errors, setErrors] = useState({});
 
-  // 이메일 중복 확인 기능
+  // 이메일 형식 및 기본 입력값 검증
   const handleCheckEmailDuplicate = async () => {
     if (!email || !email.includes("@")) {
       setErrors(prev => ({ ...prev, email: "올바른 이메일 형식을 입력해 주세요. (@ 포함)" }));
       return;
     }
-
-    try {
-      // profiles 테이블에서 이미 존재하는 이메일인지 확인 (또는 auth 확인 대안)
-      const { data, error } = await supabase.from("profiles").select("id").eq("email", email).maybeSingle();
-
-      if (data) {
-        alert("이미 사용 중인 이메일입니다.");
-        setIsEmailChecked(false);
-      } else {
-        alert("사용 가능한 이메일입니다.");
-        setIsEmailChecked(true);
-        setErrors(prev => ({ ...prev, email: "" }));
-      }
-    } catch (err) {
-      console.error("이메일 중복 확인 오류:", err);
-      // 만약 profiles 테이블에 email 컬럼이 없다면 단순 형식 통과로 처리
-      setIsEmailChecked(true);
-      alert("사용 가능한 이메일입니다.");
-    }
+    // Step 1에서는 별도의 DB 조회 없이 형식만 통과시키고 최종 가입 시 Supabase Auth에서 중복 검사를 처리합니다.
+    setErrors(prev => ({ ...prev, email: "" }));
+    alert("사용 가능한 이메일 형식입니다.");
   };
 
   const validate = () => {
@@ -102,7 +85,7 @@ export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
     e.preventDefault();
     if (validate()) {
       if (onNext) {
-        // Step 2로 데이터 전달
+        // Step 2로 데이터 전달 (이때 Supabase 가입은 절대 일어나지 않음)
         onNext({ email, password, nickname, agree });
       }
     }
@@ -167,7 +150,6 @@ export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
                     value={email}
                     onChange={e => {
                       setEmail(e.target.value);
-                      setIsEmailChecked(false);
                       if (errors.email) setErrors({ ...errors, email: "" });
                     }}
                   />
