@@ -257,12 +257,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 40px;
-}
-@media (min-width: 768px) {
-  .dietCardHeader {
-    margin-bottom: 60px;
-  }
+  margin-bottom: 50px;
 }
 
 .dietCardTitle {
@@ -300,6 +295,30 @@
 .dietCancelBtn:hover {
   border-color: var(--gray-3);
   color: var(--black-2);
+}
+
+.dietEditBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  background: var(--white-1);
+  color: var(--primary);
+  font-size: var(--medium);
+  line-height: 150%;
+  font-weight: 600;
+}
+
+.dietEditBtn:hover {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--white-1);
+}
+
+.dietEditBtn :global(.material-icons) {
+  font-size: 16px;
 }
 
 .dietSaveBtn {
@@ -393,10 +412,14 @@
 }
 
 .dietNoticeText {
-  color: var(--tag);
-  font-size: var(--xsmall);
+  color: var(--gray-3);
+  font-size: var(--small);
   line-height: 150%;
   font-weight: 400;
+}
+
+.dietViewValue {
+  margin-top: 10px;
 }
 
 /* 식단정보 (수정상태) - 비건 유형 */
