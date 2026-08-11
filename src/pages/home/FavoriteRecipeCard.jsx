@@ -1,5 +1,6 @@
 import Badge from '../../components/common/Badge';
 import styles from './FavoriteRecipeCard.module.css';
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
 function FavoriteRecipeCard({
   imageUrl,
@@ -13,6 +14,7 @@ function FavoriteRecipeCard({
   safetyTitle,
   safetyDesc,
   onClick,
+  onFavoriteClick,
 }) {
   const difficultyClassName = {
     easy: styles.easy,
@@ -31,8 +33,15 @@ function FavoriteRecipeCard({
       <div className={styles.cardImageArea}>
         <img src={imageUrl} alt={name} className={styles.cardImage} onClick={onClick} />
         <span className={`${styles.cardDifficulty} ${difficultyClassName} text-xs`}>{difficultyLabel}</span>
-        <button className={`${styles.cardHeart} material-symbols-outlined`} aria-label="좋아요">
-          favorite
+        <button
+          className={styles.cardHeart}
+          aria-label="즐겨찾기 해제"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFavoriteClick();
+          }}
+        >
+          <i className="fa-solid fa-heart" />
         </button>
       </div>
       <div className={styles.cardTextArea} onClick={onClick}>
