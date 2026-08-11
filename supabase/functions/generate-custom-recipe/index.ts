@@ -67,18 +67,12 @@ function sameIds(left: string[], right: string[]) {
 }
 
 function compact(value: unknown, limit: number) {
-  const text = typeof value === "string"
-    ? value.replace(/\s+/g, " ").trim()
-    : "";
+  const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
   return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
 }
 
-function buildReason(
-  allergies: string[],
-  veganType: string,
-  veganRestricted: boolean,
-) {
-  const reasons = allergies.map((name) => `${name} 알레르기`);
+function buildReason(allergies: string[], veganType: string, veganRestricted: boolean) {
+  const reasons = allergies.map(name => `${name} 알레르기`);
   if (veganRestricted) reasons.push(`${veganType} 대체`);
   return reasons.join(" + ");
 }
@@ -121,12 +115,10 @@ function validateAiRecipe(
   originalSteps: OriginalStep[],
   forbiddenCategoryIds: Set<string>,
 ) {
-  const restrictedIds = new Set(restricted.map((item) => item.ingredient.id));
-  const returnedIds = ai.ingredients.map((item) => item?.original_id);
+  const restrictedIds = new Set(restricted.map(item => item.ingredient.id));
+  const returnedIds = ai.ingredients.map(item => item?.original_id);
   if (!sameIds(returnedIds, [...restrictedIds])) {
-    throw new Error(
-      "Alan must return exactly one replacement for every restricted ingredient",
-    );
+    throw new Error("Alan must return exactly one replacement for every restricted ingredient");
   }
 
   for (const item of ai.ingredients) {
@@ -147,7 +139,7 @@ function validateAiRecipe(
   }
 
   for (const stepType of ["detail", "brief"] as const) {
-    const expected = originalSteps.filter((step) => step.stepType === stepType);
+    const expected = originalSteps.filter(step => step.stepType === stepType);
     const received = stepType === "detail" ? ai.detail_steps : ai.brief_steps;
     if (
       received.length !== expected.length ||
@@ -159,9 +151,7 @@ function validateAiRecipe(
           !step.description.trim(),
       )
     ) {
-      throw new Error(
-        `Alan must preserve every ${stepType} step number and count`,
-      );
+      throw new Error(`Alan must preserve every ${stepType} step number and count`);
     }
   }
 }
@@ -175,15 +165,13 @@ function createPrompt(args: {
   veganType: NamedRelation | null;
   categories: NamedRelation[];
 }) {
-  const restrictedIds = new Set(
-    args.restrictions.map((item) => item.ingredient.id),
-  );
+  const restrictedIds = new Set(args.restrictions.map(item => item.ingredient.id));
   const detailLimits = [110, 75, 45, 24];
 
   for (const detailLimit of detailLimits) {
     const input = {
       u: {
-        allergy: args.allergies.map((item) => item.name),
+        allergy: args.allergies.map(item => item.name),
         vegan: args.veganType?.name ?? "none",
       },
       r: {
@@ -191,31 +179,30 @@ function createPrompt(args: {
         servings: args.recipe.servings,
         time: args.recipe.cooking_time,
         safe: args.ingredients
-          .filter((item) => !restrictedIds.has(item.id))
-          .map((item) => compact(item.name, 18)),
-        replace: args.restrictions.map((item) => ({
+          .filter(item => !restrictedIds.has(item.id))
+          .map(item => compact(item.name, 18)),
+        replace: args.restrictions.map(item => ({
           id: item.ingredient.id,
           name: compact(item.ingredient.name, 24),
           amount: compact(item.ingredient.amount, 16),
           reason: item.reason,
         })),
         detail: args.steps
-          .filter((item) => item.stepType === "detail")
-          .map((item) => ({
+          .filter(item => item.stepType === "detail")
+          .map(item => ({
             n: item.stepNumber,
             text: compact(item.description, detailLimit),
           })),
         brief_numbers: args.steps
-          .filter((item) => item.stepType === "brief")
-          .map((item) => item.stepNumber),
+          .filter(item => item.stepType === "brief")
+          .map(item => item.stepNumber),
       },
-      categories: args.categories.map((item) =>
-        detailLimit === 24 ? item.id : `${item.id}:${item.name}`
+      categories: args.categories.map(item =>
+        detailLimit === 24 ? item.id : `${item.id}:${item.name}`,
       ),
     };
 
-    const prompt =
-      `Adapt this recipe. Output valid JSON only; write user-facing text in Korean. Replace every item in r.replace, avoid u.allergy and obey u.vegan. Choose category_id from categories. Output only replacements. Rewrite the detail steps using replacements. Keep the same detail step numbers. Create concise brief steps using exactly r.brief_numbers.
+    const prompt = `Adapt this recipe. Output valid JSON only; write user-facing text in Korean. Replace every item in r.replace, avoid u.allergy and obey u.vegan. Choose category_id from categories and output only replacements. Before rewriting, compare each replacement with the original ingredient's role, moisture, texture, fat, browning, flavor and cooking speed. Where these differ, change preparation, cut size, heat, time, oil or liquid, seasoning and insertion order as needed so the dish cooks correctly; do not merely swap ingredient names. If the same method is genuinely suitable, keep it. Preserve unaffected instructions as closely as possible. Keep the same detail step count, order and numbers. Create brief steps using exactly r.brief_numbers. Each brief step must be one complete practical Korean sentence containing enough ingredient, action, heat and time information to cook from. Do not output fragments or overly short summaries.
 JSON={"title":"","description":"","servings":null,"cooking_time":null,"ingredients":[{"original_id":"","name":"","amount":"","category_id":""}],"detail_steps":[{"step_number":1,"description":""}],"brief_steps":[{"step_number":1,"description":""}]}
 DATA=${JSON.stringify(input)}`;
 
@@ -253,14 +240,9 @@ async function callAlan(prompt: string) {
   return parseAiRecipe(answer);
 }
 
-function normalizeCustomRecipe(
-  row: Record<string, any>,
-  source: "cache" | "generated",
-) {
+function normalizeCustomRecipe(row: Record<string, any>, source: "cache" | "generated") {
   const substitutions = new Map<string, Record<string, any>>(
-    (row.ai_custom_recipe_substitutions ?? []).map((
-      item: Record<string, any>,
-    ) => [
+    (row.ai_custom_recipe_substitutions ?? []).map((item: Record<string, any>) => [
       String(item.substitute_ingredient_id),
       item,
     ]),
@@ -280,9 +262,7 @@ function normalizeCustomRecipe(
       ),
       ingredients: (row.ai_custom_recipe_ingredients ?? [])
         .slice()
-        .sort((a: Record<string, number>, b: Record<string, number>) =>
-          a.sort_order - b.sort_order
-        )
+        .sort((a: Record<string, number>, b: Record<string, number>) => a.sort_order - b.sort_order)
         .map((item: Record<string, any>) => {
           const ingredient = one(item.ingredients);
           const substitution = substitutions.get(String(item.ingredient_id));
@@ -294,9 +274,9 @@ function normalizeCustomRecipe(
             sortOrder: item.sort_order,
             replacement: substitution
               ? {
-                originalIngredientId: substitution.original_ingredient_id,
-                reason: substitution.reason,
-              }
+                  originalIngredientId: substitution.original_ingredient_id,
+                  reason: substitution.reason,
+                }
               : null,
           };
         }),
@@ -304,14 +284,12 @@ function normalizeCustomRecipe(
         detail: (row.ai_custom_recipe_steps ?? [])
           .filter((step: Record<string, string>) => step.step_type === "detail")
           .sort(
-            (a: Record<string, number>, b: Record<string, number>) =>
-              a.step_number - b.step_number,
+            (a: Record<string, number>, b: Record<string, number>) => a.step_number - b.step_number,
           ),
         brief: (row.ai_custom_recipe_steps ?? [])
           .filter((step: Record<string, string>) => step.step_type === "brief")
           .sort(
-            (a: Record<string, number>, b: Record<string, number>) =>
-              a.step_number - b.step_number,
+            (a: Record<string, number>, b: Record<string, number>) => a.step_number - b.step_number,
           ),
       },
     },
@@ -339,23 +317,18 @@ async function findCachedRecipe(
     .eq("user_id", userId)
     .eq("original_recipe_id", recipeId)
     .order("created_at", { ascending: false });
-  query = veganTypeId
-    ? query.eq("vegan_type_id", veganTypeId)
-    : query.is("vegan_type_id", null);
+  query = veganTypeId ? query.eq("vegan_type_id", veganTypeId) : query.is("vegan_type_id", null);
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).find((row) =>
+  return (data ?? []).find(row =>
     sameIds(
-      (row.ai_custom_recipe_allergies ?? []).map((item) => item.allergen_id),
+      (row.ai_custom_recipe_allergies ?? []).map(item => item.allergen_id),
       allergenIds,
-    )
+    ),
   );
 }
 
-async function findOrCreateIngredient(
-  supabase: SupabaseClient,
-  item: AiIngredient,
-) {
+async function findOrCreateIngredient(supabase: SupabaseClient, item: AiIngredient) {
   const { data: found, error: findError } = await supabase
     .from("ingredients")
     .select("id")
@@ -374,7 +347,7 @@ async function findOrCreateIngredient(
   return data.id as string;
 }
 
-Deno.serve(async (request) => {
+Deno.serve(async request => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -383,8 +356,7 @@ Deno.serve(async (request) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ??
-    Deno.env.get("SUPABASE_ANON_KEY");
+  const key = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
   const authorization = request.headers.get("Authorization");
   if (!supabaseUrl || !key) {
     return json({ error: "SERVER_CONFIGURATION_ERROR" }, 500);
@@ -410,43 +382,38 @@ Deno.serve(async (request) => {
   const userId = authData.user.id;
 
   try {
-    const [profileResult, allergyResult, recipeResult, categoriesResult] =
-      await Promise.all([
-        supabase
-          .from("profiles")
-          .select("vegan_type_id, vegan_types(id, name)")
-          .eq("id", userId)
-          .maybeSingle(),
-        supabase
-          .from("user_allergies")
-          .select("allergen_id, allergens(id, name)")
-          .eq("user_id", userId),
-        supabase
-          .from("recipes")
-          .select(
-            `id, title, description, servings, cooking_time,
+    const [profileResult, allergyResult, recipeResult, categoriesResult] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("vegan_type_id, vegan_types(id, name)")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabase
+        .from("user_allergies")
+        .select("allergen_id, allergens(id, name)")
+        .eq("user_id", userId),
+      supabase
+        .from("recipes")
+        .select(
+          `id, title, description, servings, cooking_time,
           recipe_ingredients (amount, sort_order, ingredients (id, name, category_id)),
           recipe_steps (step_number, description, step_type)`,
-          )
-          .eq("id", body.recipeId)
-          .maybeSingle(),
-        supabase.from("food_categories").select("id, name").order("name"),
-      ]);
-    const loadError = profileResult.error ?? allergyResult.error ??
-      recipeResult.error ?? categoriesResult.error;
+        )
+        .eq("id", body.recipeId)
+        .maybeSingle(),
+      supabase.from("food_categories").select("id, name").order("name"),
+    ]);
+    const loadError =
+      profileResult.error ?? allergyResult.error ?? recipeResult.error ?? categoriesResult.error;
     if (loadError) throw loadError;
     if (!recipeResult.data) return json({ error: "RECIPE_NOT_FOUND" }, 404);
 
     const veganTypeId = profileResult.data?.vegan_type_id ?? null;
-    const veganType = one(profileResult.data?.vegan_types) as
-      | NamedRelation
-      | null;
+    const veganType = one(profileResult.data?.vegan_types) as NamedRelation | null;
     const allergies = (allergyResult.data ?? [])
-      .map((item) => one(item.allergens) as NamedRelation | null)
+      .map(item => one(item.allergens) as NamedRelation | null)
       .filter((item): item is NamedRelation => Boolean(item));
-    const allergenIds = uniqueSorted(
-      (allergyResult.data ?? []).map((item) => item.allergen_id),
-    );
+    const allergenIds = uniqueSorted((allergyResult.data ?? []).map(item => item.allergen_id));
 
     const cached = await findCachedRecipe(
       supabase,
@@ -461,24 +428,22 @@ Deno.serve(async (request) => {
     const [mappingResult, veganRestrictionResult] = await Promise.all([
       allergenIds.length
         ? supabase
-          .from("allergen_category_mappings")
-          .select("allergen_id, category_id")
-          .in("allergen_id", allergenIds)
+            .from("allergen_category_mappings")
+            .select("allergen_id, category_id")
+            .in("allergen_id", allergenIds)
         : Promise.resolve({ data: [], error: null }),
       veganTypeId
         ? supabase
-          .from("vegan_type_restrictions")
-          .select("category_id")
-          .eq("vegan_type_id", veganTypeId)
+            .from("vegan_type_restrictions")
+            .select("category_id")
+            .eq("vegan_type_id", veganTypeId)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (mappingResult.error || veganRestrictionResult.error) {
       throw mappingResult.error ?? veganRestrictionResult.error;
     }
 
-    const allergenNameById = new Map(
-      allergies.map((item) => [item.id, item.name]),
-    );
+    const allergenNameById = new Map(allergies.map(item => [item.id, item.name]));
     const allergyIdsByCategory = new Map<string, string[]>();
     for (const mapping of mappingResult.data ?? []) {
       const ids = allergyIdsByCategory.get(String(mapping.category_id)) ?? [];
@@ -486,14 +451,9 @@ Deno.serve(async (request) => {
       allergyIdsByCategory.set(String(mapping.category_id), ids);
     }
     const veganCategoryIds = new Set(
-      (veganRestrictionResult.data ?? []).map((item) =>
-        String(item.category_id)
-      ),
+      (veganRestrictionResult.data ?? []).map(item => String(item.category_id)),
     );
-    const forbiddenCategoryIds = new Set([
-      ...allergyIdsByCategory.keys(),
-      ...veganCategoryIds,
-    ]);
+    const forbiddenCategoryIds = new Set([...allergyIdsByCategory.keys(), ...veganCategoryIds]);
 
     const recipe = recipeResult.data as Record<string, any>;
     const ingredients: OriginalIngredient[] = (recipe.recipe_ingredients ?? [])
@@ -501,26 +461,19 @@ Deno.serve(async (request) => {
         const ingredient = one(row.ingredients);
         return ingredient
           ? {
-            id: String(ingredient.id),
-            name: String(ingredient.name),
-            amount: row.amount == null ? null : String(row.amount),
-            categoryId: ingredient.category_id == null
-              ? null
-              : String(ingredient.category_id),
-            sortOrder: Number(row.sort_order),
-          }
+              id: String(ingredient.id),
+              name: String(ingredient.name),
+              amount: row.amount == null ? null : String(row.amount),
+              categoryId: ingredient.category_id == null ? null : String(ingredient.category_id),
+              sortOrder: Number(row.sort_order),
+            }
           : null;
       })
-      .filter((item: OriginalIngredient | null): item is OriginalIngredient =>
-        Boolean(item)
-      )
-      .sort((a: OriginalIngredient, b: OriginalIngredient) =>
-        a.sortOrder - b.sortOrder
-      );
+      .filter((item: OriginalIngredient | null): item is OriginalIngredient => Boolean(item))
+      .sort((a: OriginalIngredient, b: OriginalIngredient) => a.sortOrder - b.sortOrder);
     const steps: OriginalStep[] = (recipe.recipe_steps ?? [])
       .filter(
-        (step: Record<string, any>) =>
-          step.step_type === "detail" || step.step_type === "brief",
+        (step: Record<string, any>) => step.step_type === "detail" || step.step_type === "brief",
       )
       .map((step: Record<string, any>) => ({
         stepNumber: Number(step.step_number),
@@ -529,12 +482,11 @@ Deno.serve(async (request) => {
       }))
       .sort((a: OriginalStep, b: OriginalStep) => a.stepNumber - b.stepNumber);
 
-    const restrictions: Restriction[] = ingredients.flatMap((ingredient) => {
+    const restrictions: Restriction[] = ingredients.flatMap(ingredient => {
       if (!ingredient.categoryId) return [];
-      const allergyNames =
-        (allergyIdsByCategory.get(ingredient.categoryId) ?? [])
-          .map((id) => allergenNameById.get(id))
-          .filter((name): name is string => Boolean(name));
+      const allergyNames = (allergyIdsByCategory.get(ingredient.categoryId) ?? [])
+        .map(id => allergenNameById.get(id))
+        .filter((name): name is string => Boolean(name));
       const veganRestricted = veganCategoryIds.has(ingredient.categoryId);
       if (!allergyNames.length && !veganRestricted) return [];
       return [
@@ -542,11 +494,7 @@ Deno.serve(async (request) => {
           ingredient,
           allergyNames,
           veganRestricted,
-          reason: buildReason(
-            allergyNames,
-            veganType?.name ?? "비건",
-            veganRestricted,
-          ),
+          reason: buildReason(allergyNames, veganType?.name ?? "비건", veganRestricted),
         },
       ];
     });
@@ -567,24 +515,17 @@ Deno.serve(async (request) => {
       allergies,
       veganType,
       categories: ((categoriesResult.data ?? []) as NamedRelation[]).filter(
-        (category) => !forbiddenCategoryIds.has(String(category.id)),
+        category => !forbiddenCategoryIds.has(String(category.id)),
       ),
     });
     const ai = await callAlan(prompt);
     validateAiRecipe(ai, restrictions, steps, forbiddenCategoryIds);
 
-    const aiByOriginalId = new Map(
-      ai.ingredients.map((item) => [item.original_id, item]),
-    );
-    const restrictionByOriginalId = new Map(
-      restrictions.map((item) => [item.ingredient.id, item]),
-    );
+    const aiByOriginalId = new Map(ai.ingredients.map(item => [item.original_id, item]));
+    const restrictionByOriginalId = new Map(restrictions.map(item => [item.ingredient.id, item]));
     const replacementIds = new Map<string, string>();
     for (const item of ai.ingredients) {
-      replacementIds.set(
-        item.original_id,
-        await findOrCreateIngredient(supabase, item),
-      );
+      replacementIds.set(item.original_id, await findOrCreateIngredient(supabase, item));
     }
 
     const { data: parent, error: parentError } = await supabase
@@ -596,9 +537,7 @@ Deno.serve(async (request) => {
         title: ai.title.trim(),
         description: ai.description.trim() || null,
         servings: Number.isFinite(ai.servings) ? ai.servings : recipe.servings,
-        cooking_time: Number.isFinite(ai.cooking_time)
-          ? ai.cooking_time
-          : recipe.cooking_time,
+        cooking_time: Number.isFinite(ai.cooking_time) ? ai.cooking_time : recipe.cooking_time,
       })
       .select("id")
       .single();
@@ -606,7 +545,7 @@ Deno.serve(async (request) => {
     const customId = parent.id as string;
 
     try {
-      const ingredientRows = ingredients.map((ingredient) => {
+      const ingredientRows = ingredients.map(ingredient => {
         const replacement = aiByOriginalId.get(ingredient.id);
         return {
           ai_custom_recipe_id: customId,
@@ -616,21 +555,21 @@ Deno.serve(async (request) => {
         };
       });
       const stepRows = [
-        ...ai.detail_steps.map((step) => ({ ...step, step_type: "detail" })),
-        ...ai.brief_steps.map((step) => ({ ...step, step_type: "brief" })),
-      ].map((step) => ({
+        ...ai.detail_steps.map(step => ({ ...step, step_type: "detail" })),
+        ...ai.brief_steps.map(step => ({ ...step, step_type: "brief" })),
+      ].map(step => ({
         ai_custom_recipe_id: customId,
         step_number: step.step_number,
         description: step.description.trim(),
         step_type: step.step_type,
       }));
-      const substitutionRows = restrictions.map((item) => ({
+      const substitutionRows = restrictions.map(item => ({
         ai_custom_recipe_id: customId,
         original_ingredient_id: item.ingredient.id,
         substitute_ingredient_id: replacementIds.get(item.ingredient.id)!,
         reason: restrictionByOriginalId.get(item.ingredient.id)!.reason,
       }));
-      const allergyRows = allergenIds.map((allergenId) => ({
+      const allergyRows = allergenIds.map(allergenId => ({
         ai_custom_recipe_id: customId,
         allergen_id: allergenId,
       }));
@@ -638,14 +577,12 @@ Deno.serve(async (request) => {
       const results = await Promise.all([
         supabase.from("ai_custom_recipe_ingredients").insert(ingredientRows),
         supabase.from("ai_custom_recipe_steps").insert(stepRows),
-        supabase.from("ai_custom_recipe_substitutions").insert(
-          substitutionRows,
-        ),
+        supabase.from("ai_custom_recipe_substitutions").insert(substitutionRows),
         allergyRows.length
           ? supabase.from("ai_custom_recipe_allergies").insert(allergyRows)
           : Promise.resolve({ error: null }),
       ]);
-      const childError = results.find((result) => result.error)?.error;
+      const childError = results.find(result => result.error)?.error;
       if (childError) throw childError;
     } catch (error) {
       await supabase.from("ai_custom_recipes").delete().eq("id", customId);
@@ -664,9 +601,7 @@ Deno.serve(async (request) => {
     return json(
       {
         error: "CUSTOM_RECIPE_GENERATION_FAILED",
-        message: error instanceof Error
-          ? error.message
-          : "Unknown generation error",
+        message: error instanceof Error ? error.message : "Unknown generation error",
       },
       500,
     );
