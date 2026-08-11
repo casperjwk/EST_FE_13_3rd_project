@@ -37,7 +37,7 @@ export default function SignupPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 📌 회원가입 최종 제출 ➔ Supabase Auth 및 profiles DB 연동
+  // 회원가입 최종 제출 ➔ Supabase Auth 및 profiles DB 연동
   const handleCompleteSignup = async (step2Data = {}) => {
     const finalData = {
       ...signupData,
@@ -66,10 +66,7 @@ export default function SignupPage() {
 
       if (user) {
         // 2. profiles DB 테이블에 유저 정보 저장 (vegan_type_id 예외 처리 강화)
-        const veganValue =
-          finalData.veganType && finalData.veganType !== "none" && !isNaN(finalData.veganType)
-            ? Number(finalData.veganType)
-            : null;
+        const veganValue = finalData.veganType && finalData.veganType !== "none" ? finalData.veganType : null;
 
         const { error: dbError } = await supabase.from("profiles").insert({
           id: user.id,
