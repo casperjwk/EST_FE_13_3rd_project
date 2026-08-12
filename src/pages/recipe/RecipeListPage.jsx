@@ -169,9 +169,14 @@ function RecipeListPage() {
         ],
       }
     : null;
+  const filteredRecipes = recipes.filter((recipe) => {
+    if (recipe.hasAiCustomRecipe) return true;
 
-  const allergyFilteredRecipes = filterRecipesByAllergies(recipes, allergyFilters);
-  const filteredRecipes = filterRecipesByVeganType(allergyFilteredRecipes, veganFilter);
+    const passesAllergyFilter = filterRecipesByAllergies([recipe], allergyFilters).length > 0;
+    const passesVeganFilter = filterRecipesByVeganType([recipe], veganFilter).length > 0;
+
+    return passesAllergyFilter && passesVeganFilter;
+  });
 
   const recipesWithStatus = filteredRecipes.map((recipe) => {
     if (recipe.hasAiCustomRecipe) {
@@ -209,15 +214,9 @@ function RecipeListPage() {
           ? await getAiReplacedRecipeIds(
               authUser.id,
               loadedRecipes.map((recipe) => recipe.id),
+              conditions,
             )
           : new Set();
-
-        setRecipes(
-          loadedRecipes.map((recipe) => ({
-            ...recipe,
-            hasAiCustomRecipe: aiReplacedIds.has(String(recipe.id)),
-          })),
-        );
 
         setSafetyConditions(conditions);
         setVisibleCount(RECIPE_LOAD_COUNT);

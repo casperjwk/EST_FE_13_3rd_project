@@ -32,19 +32,49 @@ export function getCachedCustomRecipe(recipeId) {
   return requestCustomRecipe(recipeId, true);
 }
 
-export async function getAiReplacedRecipeIds(userId, recipeIds) {
-  if (!userId || recipeIds.length === 0) return new Set();
+function sameIds(a, b) {
+  if (a.length !== b.length) return false;
+  return a.every((id, index) => id === b[index]);
+}
 
-  const { data, error } = await supabase
+export async function getAiReplacedRecipeIds(userId, recipeIds, conditions) {
+  if (!userId || recipeIds.length === 0 || !conditions) return new Set();
+
+  const allergenIds = [...(conditions.allergenIds ?? [])].map(String).sort();
+  const veganTypeId = conditions.veganTypeId ?? null;
+
+  let query = supabase
     .from("ai_custom_recipes")
-    .select("original_recipe_id")
+    .select(
+      `
+      original_recipe_id,
+      vegan_type_id,
+      ai_custom_recipe_allergies (
+        allergen_id
+      )
+    `,
+    )
     .eq("user_id", userId)
     .in("original_recipe_id", recipeIds);
+
+  query = veganTypeId ? query.eq("vegan_type_id", veganTypeId) : query.is("vegan_type_id", null);
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("[HankkiLab] AI custom recipe status error:", error);
     return new Set();
   }
 
-  return new Set((data ?? []).map((row) => String(row.original_recipe_id)));
+  return new Set(
+    (data ?? [])
+      .filter((row) => {
+        const savedAllergenIds = (row.ai_custom_recipe_allergies ?? [])
+          .map((item) => String(item.allergen_id))
+          .sort();
+
+        return sameIds(savedAllergenIds, allergenIds);
+      })
+      .map((row) => String(row.original_recipe_id)),
+  );
 }
