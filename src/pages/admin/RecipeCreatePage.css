@@ -485,3 +485,14 @@
     min-width: calc(33% - 6px);
   }
 }
+.recipe-create-access-message {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+}
