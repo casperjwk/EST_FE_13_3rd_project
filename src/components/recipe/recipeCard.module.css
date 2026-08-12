@@ -210,13 +210,13 @@
 
 .statusReplaceable {
   color: var(--warning);
-  border-color: var(--tag);
+  border-color: var(--warning);
   background-color: rgba(233, 103, 43, 0.02);
 }
 
 .statusWarning {
   color: var(--danger);
-  border-color: var(--warning);
+  border-color: var(--danger);
   background-color: rgba(192, 57, 43, 0.02);
 }
 

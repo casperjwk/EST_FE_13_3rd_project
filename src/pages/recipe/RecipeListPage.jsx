@@ -9,6 +9,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { getFavoriteRecipeIds, addFavorite, removeFavorite } from "../../services/favoriteService";
 import { getUserSafetyConditions, getRecipeSafetyStatus } from "../../utils/recipeSafety";
+import { getAiReplacedRecipeIds } from "../../services/aiRecipeService";
 
 const RECIPE_LOAD_COUNT = 6;
 
@@ -130,7 +131,11 @@ function RecipeListPage() {
 
     setFavoriteRecipeIds((prev) => {
       const next = new Set(prev);
-      isCurrentlyFavorite ? next.delete(recipeId) : next.add(recipeId);
+      if (isCurrentlyFavorite) {
+        next.delete(recipeId);
+      } else {
+        next.add(recipeId);
+      }
       return next;
     });
 
@@ -169,6 +174,13 @@ function RecipeListPage() {
   const filteredRecipes = filterRecipesByVeganType(allergyFilteredRecipes, veganFilter);
 
   const recipesWithStatus = filteredRecipes.map((recipe) => {
+    if (recipe.hasAiCustomRecipe) {
+      return {
+        ...recipe,
+        status: "replaced",
+      };
+    }
+
     const safetyStatus = getRecipeSafetyStatus(recipe, effectiveConditions);
 
     return {
@@ -193,7 +205,20 @@ function RecipeListPage() {
           authUser ? getUserSafetyConditions(authUser.id) : Promise.resolve(null),
         ]);
 
-        setRecipes(loadedRecipes);
+        const aiReplacedIds = authUser
+          ? await getAiReplacedRecipeIds(
+              authUser.id,
+              loadedRecipes.map((recipe) => recipe.id),
+            )
+          : new Set();
+
+        setRecipes(
+          loadedRecipes.map((recipe) => ({
+            ...recipe,
+            hasAiCustomRecipe: aiReplacedIds.has(String(recipe.id)),
+          })),
+        );
+
         setSafetyConditions(conditions);
         setVisibleCount(RECIPE_LOAD_COUNT);
       } catch (error) {
