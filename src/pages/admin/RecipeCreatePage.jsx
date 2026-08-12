@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createRecipe, getFoodCategories } from "../../services/recipeService";
-import { isAllowedAdminEmail } from "../../config/adminAccess";
-import { supabase } from "../../lib/supabase";
+import { getAdminAccessStatus } from "../../services/adminAccess";
 import "./RecipeCreatePage.css";
 
 const CATEGORY_GROUP_DEFINITIONS = [
@@ -106,20 +105,9 @@ export default function RecipeCreatePage() {
 
     async function checkCreatePermission() {
       try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) throw error;
+        const status = await getAdminAccessStatus();
         if (!isActive) return;
-
-        if (!session?.user) {
-          setAccessStatus("signed-out");
-          return;
-        }
-
-        setAccessStatus(isAllowedAdminEmail(session.user.email) ? "allowed" : "denied");
+        setAccessStatus(status);
       } catch (error) {
         console.error("[HankkiLab] Recipe create permission check failed:", error);
         if (isActive) setAccessStatus("denied");
