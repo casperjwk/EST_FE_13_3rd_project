@@ -33,7 +33,8 @@ function sortRecipes(recipes, sortType) {
 export async function getRecips(sortType = "created") {
   const { data, error } = await supabase
     .from("recipes")
-    .select(`
+    .select(
+      `
       id,
       image_url,
       title,
@@ -48,14 +49,15 @@ export async function getRecips(sortType = "created") {
           category_id
         )
       )
-    `)
+    `,
+    )
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
-  const favoriteCounts = await getFavoriteCounts((data ?? []).map(recipe => recipe.id));
+  const favoriteCounts = await getFavoriteCounts((data ?? []).map((recipe) => recipe.id));
 
-  const recipes = (data ?? []).map(recipe => ({
+  const recipes = (data ?? []).map((recipe) => ({
     id: recipe.id,
     image_url: recipe.image_url,
     title: recipe.title,
@@ -67,9 +69,7 @@ export async function getRecips(sortType = "created") {
     likes: favoriteCounts[recipe.id] ?? 0,
     recipe_ingredients: recipe.recipe_ingredients ?? [],
     categoryIds:
-      recipe.recipe_ingredients
-        ?.map(item => item.ingredients?.category_id)
-        .filter(Boolean) ?? [],
+      recipe.recipe_ingredients?.map((item) => item.ingredients?.category_id).filter(Boolean) ?? [],
   }));
 
   return sortRecipes(recipes, sortType);

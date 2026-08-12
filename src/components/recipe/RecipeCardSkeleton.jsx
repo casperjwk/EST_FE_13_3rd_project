@@ -1,9 +1,8 @@
 //데이터 로딩시 나오는 화면
 import styles from "./recipeCard.module.css";
 
-
-export default function RecipeCardSkeleton(){
-  return(
+export default function RecipeCardSkeleton() {
+  return (
     <div className={styles.cardBorder} aria-hidden="true">
       <div className={`${styles.cardImageArea} ${styles.skeletonImage}`}>
         <span className={`${styles.cardDifficulty} ${styles.skeletonBox}`} />

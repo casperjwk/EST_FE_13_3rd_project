@@ -3,10 +3,55 @@ const VEGAN_EXCLUDE_CATEGORY_IDS = {
   플렉시테리언: [],
   폴로: ["pork", "beef", "meat", "fish", "shrimp", "crab", "shellfish", "seafood"],
   페스코: ["pork", "chicken", "beef", "meat"],
-  "락토-오보": ["pork", "chicken", "beef", "meat", "fish", "shrimp", "crab", "shellfish", "seafood"],
-  락토: ["pork", "chicken", "beef", "meat", "fish", "shrimp", "crab", "shellfish", "seafood", "eggs"],
-  오보: ["pork", "chicken", "beef", "meat", "fish", "shrimp", "crab", "shellfish", "seafood", "dairy"],
-  비건: ["pork", "chicken", "beef", "meat", "fish", "shrimp", "crab", "shellfish", "seafood", "dairy", "eggs", "honey"],
+  "락토-오보": [
+    "pork",
+    "chicken",
+    "beef",
+    "meat",
+    "fish",
+    "shrimp",
+    "crab",
+    "shellfish",
+    "seafood",
+  ],
+  락토: [
+    "pork",
+    "chicken",
+    "beef",
+    "meat",
+    "fish",
+    "shrimp",
+    "crab",
+    "shellfish",
+    "seafood",
+    "eggs",
+  ],
+  오보: [
+    "pork",
+    "chicken",
+    "beef",
+    "meat",
+    "fish",
+    "shrimp",
+    "crab",
+    "shellfish",
+    "seafood",
+    "dairy",
+  ],
+  비건: [
+    "pork",
+    "chicken",
+    "beef",
+    "meat",
+    "fish",
+    "shrimp",
+    "crab",
+    "shellfish",
+    "seafood",
+    "dairy",
+    "eggs",
+    "honey",
+  ],
 };
 
 export function filterRecipesByVeganType(recipes, veganType) {
@@ -16,8 +61,8 @@ export function filterRecipesByVeganType(recipes, veganType) {
     return recipes;
   }
 
-  return recipes.filter(recipe =>
-    !recipe.categoryIds?.some(categoryId => excludeIds.includes(categoryId))
+  return recipes.filter(
+    (recipe) => !recipe.categoryIds?.some((categoryId) => excludeIds.includes(categoryId)),
   );
 }
 
@@ -49,7 +94,7 @@ export function filterRecipesByAllergies(recipes, allergyFilters) {
     return recipes;
   }
 
-  return recipes.filter(recipe =>
-    !recipe.categoryIds?.some(categoryId => excludeCategoryIds.includes(categoryId))
+  return recipes.filter(
+    (recipe) => !recipe.categoryIds?.some((categoryId) => excludeCategoryIds.includes(categoryId)),
   );
 }
