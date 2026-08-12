@@ -9,6 +9,27 @@ import {
   getCachedCustomRecipe,
 } from "../../services/aiRecipeService";
 
+const VEGAN_TYPE_ORDER = [
+  "general",
+  "flexitarian",
+  "pollo",
+  "pesco",
+  "lacto_ovo",
+  "lacto",
+  "ovo",
+  "vegan",
+];
+
+function sortVeganTypes(veganTypes) {
+  const orderById = new Map(VEGAN_TYPE_ORDER.map((id, index) => [id, index]));
+
+  return [...veganTypes].sort(
+    (a, b) =>
+      (orderById.get(a.id) ?? VEGAN_TYPE_ORDER.length) -
+      (orderById.get(b.id) ?? VEGAN_TYPE_ORDER.length),
+  );
+}
+
 function cn(...classNames) {
   return classNames
     .filter(Boolean)
@@ -607,7 +628,7 @@ function RecipeDetailPage() {
         const [allergensResult, veganTypesResult, mappingsResult, restrictionsResult] =
         await Promise.all([
         supabase.from("allergens").select("id, name").order("name"),
-        supabase.from("vegan_types").select("id, name, description").order("name"),
+        supabase.from("vegan_types").select("id, name, description"),
         supabase.from("allergen_category_mappings").select("*"),
         supabase.from("vegan_type_restrictions").select("*"),
       ]);
@@ -626,7 +647,7 @@ function RecipeDetailPage() {
       }
 
       setAllergyOptions(allergensResult.data ?? []);
-      setVeganOptions(veganTypesResult.data ?? []);
+      setVeganOptions(sortVeganTypes(veganTypesResult.data ?? []));
       setAllergenCategoryMappings(mappingsResult.data ?? []);
       setVeganTypeRestrictions(restrictionsResult.data ?? []);
       setConditionOptionsError("");
