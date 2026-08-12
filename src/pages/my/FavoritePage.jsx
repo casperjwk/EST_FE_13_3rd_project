@@ -66,6 +66,13 @@ function FavoritePage() {
   const [appliedConditions, setAppliedConditions] = useState([]);
 
   useEffect(() => {
+    if (authLoading || authUser) {
+      return;
+    }
+    navigate("/login");
+  }, [authUser, authLoading, navigate]);
+
+  useEffect(() => {
     if (authLoading) {
       return;
     }
