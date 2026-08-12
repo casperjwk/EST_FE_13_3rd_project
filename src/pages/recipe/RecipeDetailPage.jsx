@@ -848,6 +848,22 @@ function RecipeDetailPage() {
   const startAnalysis = async () => {
     if (analysisState === "analyzing") return;
 
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error("[HankkiLab] AI recipe session check error:", sessionError);
+    }
+
+    if (!session?.user) {
+      setAnalysisProgress(0);
+      setAnalysisError("AI 맞춤 레시피 기능을 사용할 수 없습니다. 로그인 후 이용해 주세요.");
+      setAnalysisState("error");
+      return;
+    }
+
     if (aiCustomRecipe) {
       setAnalysisProgress(100);
       setAnalysisState("complete");
