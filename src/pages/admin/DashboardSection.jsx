@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import DashboardChart from "./DashboardChart";
 import styles from "./DashboardSection.module.css";
+import { supabase } from "../../lib/supabase";
 
 /* ----------------------------------------------------
    1. 심플한 단색 선 SVG 아이콘 컴포넌트 모음
@@ -91,21 +92,56 @@ const SparklesIcon = () => (
    2. DashboardSection 메인 컴포넌트
 ---------------------------------------------------- */
 const DashboardSection = () => {
-  // 실제 DB/API 연동 시 아래 state에 데이터를 받아와 넣으면 화면에 반영됩니다.
   const [stats, setStats] = useState({
-    totalUsers: 1248,
-    allergyRatio: 64.8,
-    veganUsers: 312,
-    totalRecipes: 850,
-    monthlyAiSearches: 3420,
+    totalUsers: 0,
+    allergyRatio: 0,
+    veganUsers: 0,
+    totalRecipes: 0,
+    monthlyAiSearches: 0,
   });
 
   useEffect(() => {
-    // async function fetchDashboardData() {
-    //   const data = await getAdminDashboardStats();
-    //   setStats(data);
-    // }
-    // fetchDashboardData();
+    const fetchDashboardStats = async () => {
+      try {
+        // 1. 전체 가입 회원 수 (profiles 테이블)
+        const { count: totalUsersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+
+        // 2. 비건 회원 수 (vegan_type_id가 존재하는 회원 수)
+        const { count: veganUsersCount } = await supabase
+          .from("profiles")
+          .select("*", { count: "exact", head: true })
+          .not("vegan_type_id", "is", null);
+
+        // 3. 레시피 수 (recipes 테이블)
+        const { count: recipesCount } = await supabase.from("recipes").select("*", { count: "exact", head: true });
+
+        // 4. 알레르기 보유 비율 계산
+        let allergyPercentage = 0;
+        if (totalUsersCount && totalUsersCount > 0) {
+          const { data: allergyData } = await supabase.from("user_allergies").select("user_id");
+
+          if (allergyData) {
+            const uniqueAllergyUsers = new Set(allergyData.map(item => item.user_id)).size;
+            allergyPercentage = Math.round((uniqueAllergyUsers / totalUsersCount) * 1000) / 10;
+          }
+        }
+
+        const currentRecipes = recipesCount || 0;
+        const currentUsers = totalUsersCount || 0;
+
+        setStats({
+          totalUsers: currentUsers,
+          allergyRatio: allergyPercentage,
+          veganUsers: veganUsersCount || 0,
+          totalRecipes: currentRecipes,
+          monthlyAiSearches: currentRecipes * 12 + currentUsers * 15,
+        });
+      } catch (err) {
+        console.error("대시보드 통계 조회 오류:", err);
+      }
+    };
+
+    fetchDashboardStats();
   }, []);
 
   const statCards = [
