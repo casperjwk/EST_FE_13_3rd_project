@@ -4,7 +4,7 @@ import styles from "./DashboardSection.module.css";
 import { supabase } from "../../lib/supabase";
 
 /* ----------------------------------------------------
-   1. 심플한 단색 선 SVG 아이콘 컴포넌트 모음
+    1. 심플한 단색 선 SVG 아이콘 컴포넌트 모음
 ---------------------------------------------------- */
 const UsersIcon = () => (
   <svg
@@ -89,7 +89,7 @@ const SparklesIcon = () => (
 );
 
 /* ----------------------------------------------------
-   2. DashboardSection 메인 컴포넌트
+    2. DashboardSection 메인 컴포넌트
 ---------------------------------------------------- */
 const DashboardSection = () => {
   const [stats, setStats] = useState({
@@ -103,31 +103,45 @@ const DashboardSection = () => {
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
-        // 1. 전체 가입 회원 수 (profiles 테이블)
-        const { count: totalUsersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+        console.log("🚀 Supabase 데이터 조회 시작...");
+
+        // 1. 전체 가입 회원 수 (profiles 테이블 기준)
+        const { count: totalUsersCount, error: userError } = await supabase
+          .from("profiles")
+          .select("*", { count: "exact", head: true });
+
+        console.log("📌 전체 유저 수 결과:", { totalUsersCount, userError });
 
         // 2. 비건 회원 수 (vegan_type_id가 존재하는 회원 수)
-        const { count: veganUsersCount } = await supabase
+        const { count: veganUsersCount, error: veganError } = await supabase
           .from("profiles")
           .select("*", { count: "exact", head: true })
           .not("vegan_type_id", "is", null);
 
+        console.log("📌 비건 유저 수 결과:", { veganUsersCount, veganError });
+
         // 3. 레시피 수 (recipes 테이블)
-        const { count: recipesCount } = await supabase.from("recipes").select("*", { count: "exact", head: true });
+        const { count: recipesCount, error: recipeError } = await supabase
+          .from("recipes")
+          .select("*", { count: "exact", head: true });
+
+        console.log("📌 레시피 수 결과:", { recipesCount, recipeError });
 
         // 4. 알레르기 보유 비율 계산
         let allergyPercentage = 0;
-        if (totalUsersCount && totalUsersCount > 0) {
-          const { data: allergyData } = await supabase.from("user_allergies").select("user_id");
+        const currentUsers = totalUsersCount || 0;
 
-          if (allergyData) {
+        if (currentUsers > 0) {
+          const { data: allergyData, error: allergyError } = await supabase.from("user_allergies").select("user_id");
+          console.log("📌 알레르기 데이터 결과:", { allergyData, allergyError });
+
+          if (allergyData && allergyData.length > 0) {
             const uniqueAllergyUsers = new Set(allergyData.map(item => item.user_id)).size;
-            allergyPercentage = Math.round((uniqueAllergyUsers / totalUsersCount) * 1000) / 10;
+            allergyPercentage = Math.round((uniqueAllergyUsers / currentUsers) * 1000) / 10;
           }
         }
 
         const currentRecipes = recipesCount || 0;
-        const currentUsers = totalUsersCount || 0;
 
         setStats({
           totalUsers: currentUsers,
@@ -137,7 +151,7 @@ const DashboardSection = () => {
           monthlyAiSearches: currentRecipes * 12 + currentUsers * 15,
         });
       } catch (err) {
-        console.error("대시보드 통계 조회 오류:", err);
+        console.error("❌ 대시보드 통계 조회 치명적 오류:", err);
       }
     };
 

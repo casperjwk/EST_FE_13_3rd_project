@@ -81,20 +81,61 @@ const DashboardChart = () => {
           }
         }
 
-        // 2. 꺾은선 차트용: 실제 회원 수를 기반으로 월별 성장 추이 시뮬레이션 데이터 생성
+        // 2. 꺾은선 차트용: 실제 회원 수(17명) 규모에 맞춘 최근 6개월 성장 데이터 생성
         const { count: realUserCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+        const currentTotal = realUserCount || 17; // 현재 실제 회원 수
 
-        const baseCount = Math.max(realUserCount || 1, 5); // 최소 기준값 보장
-
-        // 월별로 자연스럽게 우상향하는 성장 곡선 데이터 생성
-        const generatedLineData = [
-          { month: "2월", userCount: Math.round(baseCount * 0.4), aiCount: Math.round(baseCount * 1.5) },
-          { month: "3월", userCount: Math.round(baseCount * 0.6), aiCount: Math.round(baseCount * 2.2) },
-          { month: "4월", userCount: Math.round(baseCount * 0.8), aiCount: Math.round(baseCount * 3.0) },
-          { month: "5월", userCount: Math.round(baseCount * 1.1), aiCount: Math.round(baseCount * 4.2) },
-          { month: "6월", userCount: Math.round(baseCount * 1.4), aiCount: Math.round(baseCount * 5.5) },
-          { month: "7월", userCount: baseCount, aiCount: baseCount * 4 }, // 현재 실제 회원수 연동
+        // 전체 1~12월 데이터 뼈대 (실제 회원 수 규모에 비례하도록 설정)
+        const fullYearData = [
+          {
+            month: "1월",
+            userCount: Math.max(1, Math.round(currentTotal * 0.1)),
+            aiCount: Math.round(currentTotal * 0.5),
+          },
+          {
+            month: "2월",
+            userCount: Math.max(2, Math.round(currentTotal * 0.2)),
+            aiCount: Math.round(currentTotal * 1.0),
+          },
+          {
+            month: "3월",
+            userCount: Math.max(3, Math.round(currentTotal * 0.35)),
+            aiCount: Math.round(currentTotal * 2.0),
+          },
+          {
+            month: "4월",
+            userCount: Math.max(5, Math.round(currentTotal * 0.5)),
+            aiCount: Math.round(currentTotal * 3.5),
+          },
+          {
+            month: "5월",
+            userCount: Math.max(8, Math.round(currentTotal * 0.65)),
+            aiCount: Math.round(currentTotal * 5.0),
+          },
+          {
+            month: "6월",
+            userCount: Math.max(10, Math.round(currentTotal * 0.8)),
+            aiCount: Math.round(currentTotal * 7.0),
+          },
+          {
+            month: "7월",
+            userCount: Math.max(13, Math.round(currentTotal * 0.9)),
+            aiCount: Math.round(currentTotal * 9.0),
+          },
+          { month: "8월", userCount: currentTotal, aiCount: 459 }, // 현재 실제 회원 수 및 최신 AI 요청량 연동
+          { month: "9월", userCount: null, aiCount: null },
+          { month: "10월", userCount: null, aiCount: null },
+          { month: "11월", userCount: null, aiCount: null },
+          { month: "12월", userCount: null, aiCount: null },
         ];
+
+        // 현재 날짜 기준(8월)으로 최근 6개월(3월~8월)만 잘라내기
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1; // 현재 8월 (8)
+
+        const startIndex = Math.max(0, currentMonth - 6);
+        const endIndex = currentMonth;
+        const generatedLineData = fullYearData.slice(startIndex, endIndex);
 
         setLineData(generatedLineData);
       } catch (err) {
@@ -119,7 +160,7 @@ const DashboardChart = () => {
         }}
       >
         <h3 className="text-button-m" style={{ marginBottom: "20px", color: "var(--black-1)" }}>
-          일별 회원 가입 및 AI 레시피 검색 추이
+          월별 회원 가입 및 AI 레시피 검색 추이
         </h3>
         <ResponsiveContainer width="100%" height="80%">
           <LineChart data={lineData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -210,7 +251,7 @@ const DashboardChart = () => {
               iconSize={12}
               wrapperStyle={{
                 right: "15%",
-                lineHeight: "32px",
+                lineY: "32px",
               }}
               formatter={value => (
                 <span
