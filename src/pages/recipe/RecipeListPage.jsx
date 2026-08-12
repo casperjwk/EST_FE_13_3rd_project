@@ -218,6 +218,13 @@ function RecipeListPage() {
             )
           : new Set();
 
+        setRecipes(
+          loadedRecipes.map((recipe) => ({
+            ...recipe,
+            hasAiCustomRecipe: aiReplacedIds.has(String(recipe.id)),
+          })),
+        );
+
         setSafetyConditions(conditions);
         setVisibleCount(RECIPE_LOAD_COUNT);
       } catch (error) {
