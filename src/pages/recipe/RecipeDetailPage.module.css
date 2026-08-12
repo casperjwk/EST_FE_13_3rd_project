@@ -373,6 +373,17 @@
   color: var(--gray-3);
   border: 1px solid var(--gray-2);
   border-radius: 14px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.condition-bar__inner > button:hover,
+.condition-bar__inner > button:focus-visible {
+  color: var(--white-1);
+  background-color: var(--primary);
+  border-color: var(--primary);
 }
 
 .condition-tag,
@@ -1985,7 +1996,7 @@
   }
 
   .condition-bar__inner > button {
-    padding: 7px 20px;
+    padding: 4px 15px;
     font-size: 16px;
   }
 
@@ -2351,7 +2362,7 @@
     padding: 5px 10px;
     color: white;
     border-radius: 99999px;
-    background: var(--secondary);
+    background: var(--primary);
     font-size: 16px;
     line-height: 1.5;
     font-weight: 600;
