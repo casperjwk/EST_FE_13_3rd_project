@@ -33,36 +33,223 @@
 /* Button css */
 
 /* Header css */
-.common-header { width: 100%; background: var(--white-2); border-bottom: 1px solid var(--gray-1); position: relative; }
-.common-header__inner { position: relative; display: flex; align-items: center; justify-content: space-between; }
-.common-header__logo { display: flex; align-items: center; }
-.common-header__logo-img { width: 100px; height: 30px; }
-.common-header__nav { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 40px; }
-.common-header__nav-link { color: var(--black-1); text-decoration: none; }
-.common-header__nav-link:hover { color: var(--primary); }
-.common-header__auth-area { display: flex; align-items: center; gap: 8px; }
-.common-header__login-btn { padding: 8px 20px; border: 1px solid var(--primary); border-radius: 8px; color: var(--primary); text-decoration: none; }
-.common-header__signup-btn { padding: 8px 20px; background: var(--primary); color: var(--white-1); border-radius: 8px; text-decoration: none; }
-.common-header__profile-wrap { position: relative; }
-.common-header__profile { display: flex; align-items: center; gap: 8px; background: none; border: none; cursor: pointer; color: var(--black-1); }
-.common-header__profile-arrow { font-size: 18px; color: var(--gray-3); }
-.common-header__profile-circle { width: 32px; height: 32px; border-radius: 50%; background: var(--gray-1); overflow: hidden; }
-.common-header__profile-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-.common-header__profile-dropdown { position: absolute; right: 0; top: calc(100% + 8px); width: 150px; display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--gray-1); border-radius: 8px; background: var(--white-1); z-index: 10; }
-.common-header__profile-dropdown-link { color: var(--black-1); text-decoration: none; padding: 6px 4px; }
-.common-header__profile-dropdown-link:hover { color: var(--primary); }
-.common-header__profile-dropdown-logout { color: var(--danger); text-align: left; padding: 6px 4px; }
-.common-header__hamburger-btn { display: none; }
-.common-header__hamburger-icon { font-size: 24px; color: #000000; }
-.common-header__mobile-menu { display: flex; flex-direction: column; width: 200px; border: 1px solid var(--gray-1); background: var(--white-1); position: absolute; right: 24px; top: 100%; padding: 16px; gap: 12px; z-index: 10; }
-.common-header__mobile-profile { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-1); }
-.common-header__mobile-link { color: var(--black-1); text-decoration: none; }
-.common-header__logout-btn { color: var(--danger); text-align: left; }
-.common-header__mobile-auth-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-.common-header__mobile-auth-btns > * { width: 100%; text-align: center; white-space: nowrap; box-sizing: border-box; }
-@media (min-width: 1272px) { .common-header__inner { height: 80px; } }
-@media (min-width: 768px) and (max-width: 1271px) { .common-header__inner { height: 64px; padding: 20px; } .common-header__login-btn, .common-header__signup-btn { padding: 6px 15px; } }
-@media (max-width: 767px) { .common-header__inner { height: 56px; padding: 10px 16px; } .common-header__logo-img { width: 80px; height: 24px; } .common-header__nav, .common-header__auth-area { display: none; } .common-header__hamburger-btn { display: block; } }
+.common-header {
+  width: 100%;
+  background: var(--white-2);
+  border-bottom: 1px solid var(--gray-1);
+  position: relative;
+}
+
+.common-header__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.common-header__logo {
+  display: flex;
+  align-items: center;
+}
+
+.common-header__logo-img {
+  width: 100px;
+  height: 30px;
+}
+
+.common-header__nav {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 40px;
+}
+
+.common-header__nav-link {
+  color: var(--black-1);
+  text-decoration: none;
+}
+
+.common-header__nav-link:hover {
+  color: var(--primary);
+}
+
+.common-header__auth-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.common-header__login-btn {
+  padding: 8px 20px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.common-header__signup-btn {
+  padding: 8px 20px;
+  background: var(--primary);
+  color: var(--white-1);
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.common-header__profile-wrap {
+  position: relative;
+}
+
+.common-header__profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--black-1);
+}
+
+.common-header__profile-arrow {
+  font-size: 18px;
+  color: var(--gray-3);
+}
+
+.common-header__profile-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gray-1);
+  overflow: hidden;
+}
+
+.common-header__profile-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.common-header__profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--gray-1);
+  border-radius: 8px;
+  background: var(--white-1);
+  z-index: 10;
+}
+
+.common-header__profile-dropdown-link {
+  color: var(--black-1);
+  text-decoration: none;
+  padding: 6px 4px;
+}
+
+.common-header__profile-dropdown-link:hover {
+  color: var(--primary);
+}
+
+.common-header__profile-dropdown-logout {
+  color: var(--danger);
+  text-align: left;
+  padding: 6px 4px;
+}
+
+.common-header__hamburger-btn {
+  display: none;
+}
+
+.common-header__hamburger-icon {
+  font-size: 24px;
+  color: #000000;
+}
+
+.common-header__mobile-menu {
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  border: 1px solid var(--gray-1);
+  background: var(--white-1);
+  position: absolute;
+  right: 24px;
+  top: 100%;
+  padding: 16px;
+  gap: 12px;
+  z-index: 10;
+}
+
+.common-header__mobile-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-1);
+}
+
+.common-header__mobile-link {
+  color: var(--black-1);
+  text-decoration: none;
+}
+
+.common-header__logout-btn {
+  color: var(--danger);
+  text-align: left;
+}
+
+.common-header__mobile-auth-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.common-header__mobile-auth-btns > * {
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1272px) {
+  .common-header__inner {
+    height: 80px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1271px) {
+  .common-header__inner {
+    height: 64px;
+    padding: 20px;
+  }
+  .common-header__login-btn,
+  .common-header__signup-btn {
+    padding: 6px 15px;
+  }
+}
+
+@media (max-width: 767px) {
+  .common-header__inner {
+    height: 56px;
+    padding: 10px 16px;
+  }
+  .common-header__logo-img {
+    width: 80px;
+    height: 24px;
+  }
+  .common-header__nav,
+  .common-header__auth-area {
+    display: none;
+  }
+  .common-header__hamburger-btn {
+    display: block;
+  }
+}
 /* Footer css */
 .common-footer {
   width: 100%;
