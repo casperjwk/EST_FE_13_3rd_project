@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import Badge from "../../components/common/Badge";
 import { supabase } from "../../lib/supabase";
 import styles from "./RecipeDetailPage.module.css";
@@ -216,6 +216,8 @@ function AnalysisPanel({
   onStart,
   onCompare,
   onMoreInfo,
+  requiresLogin,
+  onLogin,
 }) {
   if (analysisState === "analyzing") {
     const completedCount = Math.min(Math.floor(progress / 25), analysisSteps.length);
@@ -303,9 +305,18 @@ function AnalysisPanel({
             <p className="text-xs">{errorMessage}</p>
           </div>
         </div>
-        <div className={cn("mismatch-card__actions")}>
-          <button className={cn("primary-button text-button-s")} type="button" onClick={onStart}>
-            다시 시도
+        <div
+          className={cn(
+            "mismatch-card__actions",
+            requiresLogin ? "mismatch-card__actions--single" : "",
+          )}
+        >
+          <button
+            className={cn("primary-button text-button-s")}
+            type="button"
+            onClick={requiresLogin ? onLogin : onStart}
+          >
+            {requiresLogin ? "로그인 페이지로 이동" : "다시 시도"}
           </button>
         </div>
       </section>
@@ -421,12 +432,14 @@ function RecipeDetailSkeleton() {
 
 function RecipeDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [recipe, setRecipe] = useState(null);
   const [isRecipeLoading, setIsRecipeLoading] = useState(true);
   const [recipeError, setRecipeError] = useState("");
   const [analysisState, setAnalysisState] = useState("before");
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisError, setAnalysisError] = useState("");
+  const [analysisRequiresLogin, setAnalysisRequiresLogin] = useState(false);
   const [aiCustomRecipe, setAiCustomRecipe] = useState(null);
   const [isSimpleRecipeOpen, setIsSimpleRecipeOpen] = useState(false);
   const [simpleRecipeStep, setSimpleRecipeStep] = useState(0);
@@ -860,6 +873,7 @@ function RecipeDetailPage() {
     if (!session?.user) {
       setAnalysisProgress(0);
       setAnalysisError("AI 맞춤 레시피 기능을 사용할 수 없습니다. 로그인 후 이용해 주세요.");
+      setAnalysisRequiresLogin(true);
       setAnalysisState("error");
       return;
     }
@@ -872,6 +886,7 @@ function RecipeDetailPage() {
 
     setAnalysisProgress(0);
     setAnalysisError("");
+    setAnalysisRequiresLogin(false);
     setAnalysisState("analyzing");
 
     try {
@@ -895,6 +910,7 @@ function RecipeDetailPage() {
       setAnalysisError(
         error instanceof Error ? error.message : "AI 맞춤 레시피를 만들지 못했습니다.",
       );
+      setAnalysisRequiresLogin(false);
       setAnalysisProgress(0);
       setAnalysisState("error");
     }
@@ -1071,6 +1087,8 @@ function RecipeDetailPage() {
               onStart={startAnalysis}
               onCompare={showOriginalRecipe}
               onMoreInfo={() => setIsMoreInfoOpen(true)}
+              requiresLogin={analysisRequiresLogin}
+              onLogin={() => navigate("/login")}
             />
 
             <div className={cn("safety-notice")}>

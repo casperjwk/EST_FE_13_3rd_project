@@ -623,6 +623,14 @@
   border-top: 1px solid var(--gray-1);
 }
 
+.mismatch-card__actions--single {
+  grid-template-columns: 1fr;
+}
+
+.mismatch-card__actions--single .primary-button {
+  width: 100%;
+}
+
 .primary-button,
 .secondary-button {
   display: flex;

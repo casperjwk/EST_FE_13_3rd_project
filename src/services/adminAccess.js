@@ -9,12 +9,18 @@ export async function getAdminAccessStatus() {
   if (userError) throw userError;
   if (!user) return "signed-out";
 
-  const { data: admin, error: adminError } = await supabase
-    .from("admins")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: admins, error: adminError } = await supabase.from("admins").select("*");
 
   if (adminError) throw adminError;
-  return admin ? "allowed" : "denied";
+
+  const userId = user.id.toLowerCase();
+  const userEmail = user.email?.trim().toLowerCase() ?? "";
+  const isAdmin = (admins ?? []).some(admin => {
+    const registeredAdminId = admin.admin_id ?? admin.user_id ?? admin.id ?? admin.email;
+    const normalizedAdminId = String(registeredAdminId ?? "").trim().toLowerCase();
+
+    return normalizedAdminId === userId || (userEmail && normalizedAdminId === userEmail);
+  });
+
+  return isAdmin ? "allowed" : "denied";
 }
