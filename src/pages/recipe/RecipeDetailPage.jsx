@@ -535,7 +535,8 @@ function RecipeDetailPage() {
 
       setIsRecipeLoading(true);
       setRecipeError("");
-      const { data, error } = await supabase
+      try {
+        const { data, error } = await supabase
         .from("recipes")
         .select(
           `
@@ -565,13 +566,13 @@ function RecipeDetailPage() {
         .eq("id", id)
         .maybeSingle();
 
-      if (!isActive) return;
-      if (error) {
+        if (!isActive) return;
+        if (error) {
         console.error("[HankkiLab] Recipe detail error:", error);
         setRecipeError("레시피를 불러오지 못했습니다.");
-      } else if (!data) {
+        } else if (!data) {
         setRecipeError("존재하지 않는 레시피입니다.");
-      } else {
+        } else {
         setRecipe(data);
         setAnalysisState("before");
         setAnalysisProgress(0);
@@ -580,9 +581,15 @@ function RecipeDetailPage() {
         setSimpleRecipeStep(0);
         setRecipeQuestion("");
         setQuestionMessages([]);
-        void recordLoadedRecipeView(data.id);
+          void recordLoadedRecipeView(data.id);
+        }
+      } catch (error) {
+        if (!isActive) return;
+        console.error("[HankkiLab] Recipe detail request failed:", error);
+        setRecipeError("레시피를 불러오지 못했습니다.");
+      } finally {
+        if (isActive) setIsRecipeLoading(false);
       }
-      setIsRecipeLoading(false);
     }
 
     loadRecipe();
@@ -596,7 +603,8 @@ function RecipeDetailPage() {
 
     async function loadConditionOptions() {
       setIsConditionDataLoading(true);
-      const [allergensResult, veganTypesResult, mappingsResult, restrictionsResult] =
+      try {
+        const [allergensResult, veganTypesResult, mappingsResult, restrictionsResult] =
         await Promise.all([
         supabase.from("allergens").select("id, name").order("name"),
         supabase.from("vegan_types").select("id, name, description").order("name"),
@@ -622,7 +630,13 @@ function RecipeDetailPage() {
       setAllergenCategoryMappings(mappingsResult.data ?? []);
       setVeganTypeRestrictions(restrictionsResult.data ?? []);
       setConditionOptionsError("");
-      setIsConditionDataLoading(false);
+        setIsConditionDataLoading(false);
+      } catch (error) {
+        if (!isActive) return;
+        console.error("[HankkiLab] Condition options request failed:", error);
+        setConditionOptionsError("조건 목록을 불러오지 못했습니다.");
+        setIsConditionDataLoading(false);
+      }
     }
 
     loadConditionOptions();
@@ -636,8 +650,8 @@ function RecipeDetailPage() {
 
     async function loadUserConditions() {
       setIsUserConditionsLoading(true);
-
-      const {
+      try {
+        const {
         data: { session },
         error: sessionError,
       } = await supabase.auth.getSession();
@@ -712,7 +726,12 @@ function RecipeDetailPage() {
       setAppliedVeganTypeId(profileResult.data?.vegan_type_id ?? null);
       setDraftAllergies(allergies);
       setDraftVeganType(veganType);
-      setIsUserConditionsLoading(false);
+        setIsUserConditionsLoading(false);
+      } catch (error) {
+        if (!isActive) return;
+        console.error("[HankkiLab] User conditions request failed:", error);
+        setIsUserConditionsLoading(false);
+      }
     }
 
     loadUserConditions();
@@ -727,12 +746,14 @@ function RecipeDetailPage() {
     let isActive = true;
 
     async function loadCachedCustomRecipe() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session || !isActive) return;
-
       try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!session || !isActive) return;
+
         const result = await getCachedCustomRecipe(id);
         if (!isActive || !result?.customRecipe) return;
 
@@ -903,11 +924,12 @@ function RecipeDetailPage() {
     setRecipeQuestion("");
     setIsQuestionLoading(true);
 
-    const {
+    try {
+      const {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session) {
+      if (!session) {
       setQuestionMessages(current => [
         ...current,
         {
@@ -916,19 +938,18 @@ function RecipeDetailPage() {
           status: "error",
         },
       ]);
-      setIsQuestionLoading(false);
-      return;
-    }
+        return;
+      }
 
-    const { data, error } = await supabase.functions.invoke("answer-recipe-question", {
-      body: {
-        recipeId: recipe.id,
-        question,
-        conversation: previousConversation,
-      },
-    });
+      const { data, error } = await supabase.functions.invoke("answer-recipe-question", {
+        body: {
+          recipeId: recipe.id,
+          question,
+          conversation: previousConversation,
+        },
+      });
 
-    if (error) {
+      if (error) {
       console.error("[HankkiLab] Recipe question error:", error);
       setQuestionMessages(current => [
         ...current,
@@ -938,7 +959,7 @@ function RecipeDetailPage() {
           status: "error",
         },
       ]);
-    } else if (!data?.answer) {
+      } else if (!data?.answer) {
       setQuestionMessages(current => [
         ...current,
         {
@@ -947,11 +968,22 @@ function RecipeDetailPage() {
           status: "error",
         },
       ]);
-    } else {
-      setQuestionMessages(current => [...current, { role: "assistant", content: data.answer }]);
+      } else {
+        setQuestionMessages(current => [...current, { role: "assistant", content: data.answer }]);
+      }
+    } catch (error) {
+      console.error("[HankkiLab] Recipe question request failed:", error);
+      setQuestionMessages(current => [
+        ...current,
+        {
+          role: "assistant",
+          content: "답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+          status: "error",
+        },
+      ]);
+    } finally {
+      setIsQuestionLoading(false);
     }
-
-    setIsQuestionLoading(false);
   };
 
   if (isRecipeLoading || isUserConditionsLoading || isConditionDataLoading) {
