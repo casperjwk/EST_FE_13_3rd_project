@@ -92,11 +92,15 @@
   text-align: left;
 }
 
+.profileCardAvatarWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .profileCardAvatar {
   position: relative;
   width: 80px;
   height: 80px;
-  flex-shrink: 0;
   border-radius: 50%;
   background: var(--secondary);
   border: 1px solid var(--primary);
@@ -135,6 +139,30 @@
   font-size: 18px;
   opacity: 0;
   transition: opacity 0.15s ease;
+}
+
+.profileCardAvatarDelete {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--gray-1);
+  background: var(--white-1);
+  color: var(--gray-3);
+}
+.profileCardAvatarDelete:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.profileCardAvatarDelete :global(.material-icons) {
+  font-size: 12px;
 }
 
 .profileCardAvatar:hover .profileCardAvatarEdit {
@@ -761,4 +789,288 @@
 
 .recentMetaItemLikes {
   color: var(--danger);
+}
+
+/* 계정 관리 - 로그아웃/회원 탈퇴 버튼 */
+.accountActions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 30px;
+}
+@media (min-width: 768px) {
+  .accountActions {
+    margin-top: 40px;
+  }
+}
+
+.logoutBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 175px;
+  height: 44px;
+  padding: 10px 30px;
+  border: 1px solid var(--gray-3);
+  border-radius: 10px;
+  background: var(--white-1);
+  color: var(--gray-3);
+  font-size: var(--medium);
+  line-height: 150%;
+  font-weight: 600;
+}
+
+.logoutBtn:hover,
+.logoutBtn:focus-visible {
+  border-color: var(--black-1);
+  color: var(--black-1);
+}
+
+.withdrawBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 175px;
+  height: 44px;
+  padding: 10px 30px;
+  border: none;
+  border-radius: 10px;
+  background: var(--danger);
+  color: var(--white-1);
+  font-size: var(--medium);
+  line-height: 150%;
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .accountActions {
+    align-items: center;
+  }
+
+  .logoutBtn,
+  .withdrawBtn {
+    flex: 1;
+    width: auto;
+  }
+}
+
+/* 계정 관리 - 회원 탈퇴 처리 중 표시 */
+.processingLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.processingDots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.processingDots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: processingDotBounce 1.2s ease-in-out infinite;
+}
+
+.processingDots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.processingDots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes processingDotBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+/* 계정 관리 - 회원 탈퇴 완료 토스트 */
+.withdrawToast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  z-index: 1100;
+  padding: 12px 24px;
+  border-radius: 30px;
+  background: var(--black-1);
+  color: var(--white-1);
+  font-size: var(--small);
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(20px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.withdrawToastShow {
+  opacity: 1;
+  transform: translateX(-50%);
+}
+
+/* 계정 관리 - 회원 탈퇴 확인 모달 */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+}
+
+.modalBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 350px;
+  height: 250px;
+  padding: 30px;
+  border-radius: 12px;
+  background: var(--white-1);
+  text-align: center;
+}
+@media (min-width: 768px) {
+  .modalBox {
+    width: 480px;
+    height: 350px;
+    padding: 40px;
+  }
+}
+
+.modalIconCircle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 15px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: var(--white-1);
+  font-size: 16px;
+}
+@media (min-width: 768px) {
+  .modalIconCircle {
+    width: 50px;
+    height: 50px;
+    margin-bottom: 30px;
+    font-size: 25px;
+  }
+}
+
+.modalTitle {
+  margin: 0 0 7px;
+  color: var(--black-1);
+  font-size: var(--subtitle-s);
+  line-height: 140%;
+  font-weight: 600;
+}
+@media (min-width: 768px) {
+  .modalTitle {
+    margin-bottom: 15px;
+    font-size: var(--title-s);
+    line-height: 130%;
+    font-weight: 700;
+  }
+}
+
+.modalDesc {
+  margin: 0 0 30px;
+  color: var(--gray-3);
+  font-size: var(--xsmall);
+  line-height: 150%;
+  font-weight: 400;
+}
+@media (min-width: 768px) {
+  .modalDesc {
+    margin-bottom: 44px;
+    font-size: var(--medium);
+  }
+}
+
+.modalDescFailed {
+  margin-bottom: 48px;
+}
+@media (min-width: 768px) {
+  .modalDescFailed {
+    margin-bottom: 68px;
+  }
+}
+
+.modalDescEmphasis {
+  color: var(--danger);
+  font-size: var(--xsmall);
+  line-height: 150%;
+  font-weight: 600;
+}
+@media (min-width: 768px) {
+  .modalDescEmphasis {
+    font-size: var(--medium);
+  }
+}
+
+.modalActions {
+  display: flex;
+  gap: 20px;
+}
+
+.modalCancelBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 135px;
+  height: 44px;
+  border: 1px solid var(--gray-3);
+  border-radius: 10px;
+  background: var(--white-1);
+  color: var(--gray-3);
+  font-size: var(--medium);
+  line-height: 150%;
+  font-weight: 600;
+}
+.modalCancelBtn:hover {
+  border-color: var(--black-1);
+  color: var(--black-1);
+}
+
+.modalConfirmBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 135px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: var(--danger);
+  color: var(--white-1);
+  font-size: var(--medium);
+  line-height: 150%;
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .modalCancelBtn,
+  .modalConfirmBtn {
+    width: 175px;
+  }
 }
