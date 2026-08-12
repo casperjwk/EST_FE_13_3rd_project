@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createRecipe, getFoodCategories } from "../../services/recipeService";
+import { getAdminAccessStatus } from "../../services/adminAccess";
 import "./RecipeCreatePage.css";
 
 const CATEGORY_GROUP_DEFINITIONS = [
@@ -97,8 +98,31 @@ export default function RecipeCreatePage() {
   const [categoryError, setCategoryError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState("");
+  const [accessStatus, setAccessStatus] = useState("checking");
 
   useEffect(() => {
+    let isActive = true;
+
+    async function checkCreatePermission() {
+      try {
+        const status = await getAdminAccessStatus();
+        if (!isActive) return;
+        setAccessStatus(status);
+      } catch (error) {
+        console.error("[HankkiLab] Recipe create permission check failed:", error);
+        if (isActive) setAccessStatus("denied");
+      }
+    }
+
+    void checkCreatePermission();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (accessStatus !== "allowed") return undefined;
+
     let isActive = true;
 
     getFoodCategories()
@@ -117,7 +141,7 @@ export default function RecipeCreatePage() {
       isActive = false;
       clearTimeout(toastTimerRef.current);
     };
-  }, []);
+  }, [accessStatus]);
 
   const showToast = message => {
     clearTimeout(toastTimerRef.current);
@@ -244,6 +268,30 @@ export default function RecipeCreatePage() {
       ))}
     </div>
   );
+
+  if (accessStatus === "checking") {
+    return (
+      <main className="recipe-create-access-message">
+        <p>접근 권한을 확인하고 있습니다.</p>
+      </main>
+    );
+  }
+
+  if (accessStatus === "signed-out") {
+    return (
+      <main className="recipe-create-access-message">
+        <p>로그인이 필요한 페이지입니다.</p>
+      </main>
+    );
+  }
+
+  if (accessStatus === "denied") {
+    return (
+      <main className="recipe-create-access-message" role="alert">
+        <p>허가된 사용자가 아니라면 접근할 수 없는 페이지입니다.</p>
+      </main>
+    );
+  }
 
   return (
     <div className="recipe-create-page" onClick={() => setOpenCategoryId(null)}>

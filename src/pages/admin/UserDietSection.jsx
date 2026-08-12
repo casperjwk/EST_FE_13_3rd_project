@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./UserDietSection.module.css";
+import { supabase } from "../../lib/supabase";
 
 /* ----------------------------------------------------
    단색 선 SVG 아이콘 모음
@@ -135,35 +136,164 @@ const UserAvatarIcon = () => (
 );
 
 /* ----------------------------------------------------
-   UserDietSection 메인 컴포넌트
+   UserDietSection 메인 컴포넌트 (Supabase 연동)
 ---------------------------------------------------- */
 const UserDietSection = () => {
-  const [stats] = useState({
-    totalUsers: 1248,
-    allergyRatio: 64.8,
-    veganUsers: 312,
-    totalRecipes: 850,
-    monthlyAiSearches: 3420,
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    allergyRatio: 0,
+    veganUsers: 0,
+    totalRecipes: 0,
+    monthlyAiSearches: 0, // 3420 고정값 제거
   });
 
-  const [userInfo] = useState({
-    name: "관리자",
+  const [userInfo, setUserInfo] = useState({
+    name: "로딩 중...",
     status: "정상 회원",
-    email: "han77ilab@naver.com",
-    joinDate: "2026-00-00",
-    favoritesCount: 12,
-    allergies: ["우유", "돼지고기"],
+    email: "",
+    joinDate: "",
+    favoritesCount: 0,
+    allergies: [],
     veganType: {
-      name: "플렉시테리언 (Flexitarian)",
-      status: "현재 적용 중",
-      description: "주로 채식을 지향하지만, 상황에 따라 가끔 육류 소비를 허용하는 단계입니다.",
+      name: "설정되지 않음",
+      status: "미적용",
+      description: "지정된 비건 식단이 없습니다.",
     },
-    appliedConditions: [
-      { text: "우유 제외", type: "danger" },
-      { text: "돼지고기 제외", type: "danger" },
-      { text: "플렉시테리언 가이드", type: "primary" },
-    ],
+    appliedConditions: [],
   });
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAdminDietData = async () => {
+      try {
+        const currentEmail = localStorage.getItem("userEmail") || "han77ilab@naver.com";
+
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("email", currentEmail)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error("프로필 조회 오류:", profileError.message);
+        }
+
+        let userId = profileData?.id;
+
+        if (!profileData) {
+          const { data: firstProfile } = await supabase.from("profiles").select("*").limit(1).maybeSingle();
+          if (firstProfile) {
+            userId = firstProfile.id;
+          }
+        }
+
+        const targetProfile = profileData || {};
+        const formattedJoinDate = targetProfile.created_at ? targetProfile.created_at.split("T")[0] : "2026-00-00";
+
+        let veganInfo = {
+          name: "일반 식단 (지정 안 함)",
+          status: "미적용",
+          description: "선택된 비건 식단이 없습니다.",
+        };
+
+        if (targetProfile.vegan_type_id) {
+          const { data: veganTypeData } = await supabase
+            .from("vegan_types")
+            .select("name, description")
+            .eq("id", targetProfile.vegan_type_id)
+            .maybeSingle();
+
+          if (veganTypeData) {
+            veganInfo = {
+              name: veganTypeData.name,
+              status: "현재 적용 중",
+              description: veganTypeData.description || "선택하신 비건 식단 가이드가 적용됩니다.",
+            };
+          }
+        }
+
+        let allergyNames = [];
+        if (userId) {
+          const { data: userAllergiesData } = await supabase
+            .from("user_allergies")
+            .select("allergen_id")
+            .eq("user_id", userId);
+
+          if (userAllergiesData && userAllergiesData.length > 0) {
+            const allergenIds = userAllergiesData.map(item => item.allergen_id);
+            const { data: allergensData } = await supabase.from("allergens").select("name").in("id", allergenIds);
+
+            if (allergensData) {
+              allergyNames = allergensData.map(a => a.name);
+            }
+          }
+        }
+
+        const appliedConditions = [...allergyNames.map(name => ({ text: `${name} 제외`, type: "danger" }))];
+        if (targetProfile.vegan_type_id) {
+          appliedConditions.push({ text: `${veganInfo.name} 가이드`, type: "primary" });
+        }
+
+        // 통계 집계 (대시보드와 동일한 방식 적용)
+        const { count: totalUsersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+
+        const { count: veganUsersCount } = await supabase
+          .from("profiles")
+          .select("*", { count: "exact", head: true })
+          .not("vegan_type_id", "is", null);
+
+        const { count: recipesCount } = await supabase.from("recipes").select("*", { count: "exact", head: true });
+
+        let allergyPercentage = 0;
+        if (totalUsersCount && totalUsersCount > 0) {
+          const { data: allergyData } = await supabase.from("user_allergies").select("user_id");
+          if (allergyData) {
+            const uniqueAllergyUsers = new Set(allergyData.map(item => item.user_id)).size;
+            allergyPercentage = Math.round((uniqueAllergyUsers / totalUsersCount) * 1000) / 10;
+          }
+        }
+
+        const currentRecipes = recipesCount || 0;
+        const currentUsers = totalUsersCount || 0;
+
+        setStats({
+          totalUsers: currentUsers,
+          allergyRatio: allergyPercentage,
+          veganUsers: veganUsersCount || 0,
+          totalRecipes: currentRecipes,
+          monthlyAiSearches: currentRecipes * 12 + currentUsers * 15, // 대시보드와 동일한 동적 계산식 적용
+        });
+
+        let favCount = 0;
+        if (userId) {
+          const { count: favoriteCount } = await supabase
+            .from("favorites")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", userId);
+          favCount = favoriteCount || 0;
+        }
+
+        setUserInfo({
+          name: targetProfile.nickname || "관리자",
+          status: "정상 회원",
+          email: targetProfile.email || currentEmail,
+          joinDate: formattedJoinDate,
+          favoritesCount: favCount,
+          allergies: allergyNames,
+          veganType: veganInfo,
+          appliedConditions:
+            appliedConditions.length > 0 ? appliedConditions : [{ text: "적용된 조건 없음", type: "primary" }],
+        });
+      } catch (err) {
+        console.error("관리자 식단 관리 데이터 로드 예외:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAdminDietData();
+  }, []);
 
   const statCards = [
     { id: "totalUsers", label: "전체 가입 회원", value: `${stats.totalUsers.toLocaleString()}명`, icon: <UsersIcon /> },
@@ -177,6 +307,10 @@ const UserDietSection = () => {
       icon: <SparklesIcon />,
     },
   ];
+
+  if (isLoading) {
+    return <div style={{ padding: "40px", textAlign: "center" }}>데이터 불러오는 중...</div>;
+  }
 
   return (
     <div className={styles.container}>
@@ -233,11 +367,15 @@ const UserDietSection = () => {
             <span className={styles.itemCount}>총 {userInfo.allergies.length}개 항목 등록됨</span>
           </div>
           <div className={styles.tagList}>
-            {userInfo.allergies.map((allergy, idx) => (
-              <span key={idx} className={styles.dangerTag}>
-                {allergy}
-              </span>
-            ))}
+            {userInfo.allergies.length > 0 ? (
+              userInfo.allergies.map((allergy, idx) => (
+                <span key={idx} className={styles.dangerTag}>
+                  {allergy}
+                </span>
+              ))
+            ) : (
+              <span style={{ color: "var(--gray-3)", fontSize: "14px" }}>등록된 알레르기가 없습니다.</span>
+            )}
           </div>
         </div>
 

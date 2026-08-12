@@ -1,9 +1,34 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import Badge from "../../components/common/Badge";
 import { supabase } from "../../lib/supabase";
 import styles from "./RecipeDetailPage.module.css";
 import { recordRecipeView } from "../../services/recentViewService";
+import {
+  generateCustomRecipe,
+  getCachedCustomRecipe,
+} from "../../services/aiRecipeService";
+
+const VEGAN_TYPE_ORDER = [
+  "general",
+  "flexitarian",
+  "pollo",
+  "pesco",
+  "lacto_ovo",
+  "lacto",
+  "ovo",
+  "vegan",
+];
+
+function sortVeganTypes(veganTypes) {
+  const orderById = new Map(VEGAN_TYPE_ORDER.map((id, index) => [id, index]));
+
+  return [...veganTypes].sort(
+    (a, b) =>
+      (orderById.get(a.id) ?? VEGAN_TYPE_ORDER.length) -
+      (orderById.get(b.id) ?? VEGAN_TYPE_ORDER.length),
+  );
+}
 
 function cn(...classNames) {
   return classNames
@@ -109,29 +134,14 @@ function Condition({ allergies, veganType, onOpenConditions }) {
   );
 }
 
-function IngredientPanel({ isComplete, ingredients }) {
-  const displayedIngredients = isComplete
-    ? ingredients.map(ingredient =>
-        ingredient.warning || ingredient.needReplacement
-          ? {
-              name: "느타리버섯",
-              amount: "200g",
-              replacement: [ingredient.warning, ingredient.needReplacement]
-                .filter(Boolean)
-                .join(" + "),
-              original: ingredient,
-            }
-          : ingredient,
-      )
-    : ingredients;
-
+function IngredientPanel({ ingredients }) {
   return (
     <aside className={cn("ingredient-card")}>
       <h2>
         <Icon name="book" size={16} /> 재료
       </h2>
       <ul>
-        {displayedIngredients.map(ingredient => (
+        {ingredients.map(ingredient => (
           <li
             key={ingredient.id ?? ingredient.name}
             className={cn("ingredient")}
@@ -200,10 +210,14 @@ function IngredientPanel({ isComplete, ingredients }) {
 function AnalysisPanel({
   analysisState,
   progress,
+  errorMessage,
+  replacementCount,
   mismatchedIngredients,
   onStart,
   onCompare,
   onMoreInfo,
+  requiresLogin,
+  onLogin,
 }) {
   if (analysisState === "analyzing") {
     const completedCount = Math.min(Math.floor(progress / 25), analysisSteps.length);
@@ -253,7 +267,9 @@ function AnalysisPanel({
           <Icon name="shield" size={25} />
           <div>
             <h2>내 조건에 맞게 안전하게 변경되었어요</h2>
-            <p className="text-xs">1개의 재료가 대체되었으며 조리 과정도 함께 안내드려요.</p>
+            <p className="text-xs">
+              {replacementCount}개의 재료가 대체되었으며 조리 과정도 함께 안내드려요.
+            </p>
           </div>
         </div>
         <div className={cn("complete-card__actions")}>
@@ -271,6 +287,36 @@ function AnalysisPanel({
             onClick={onMoreInfo}
           >
             <Icon name="info" size={14} />더 알아보기
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (analysisState === "error") {
+    return (
+      <section className={cn("mismatch-card")} role="alert">
+        <div className={cn("mismatch-card__title")}>
+          <span className={cn("mismatch-card__warning-icon")}>
+            <Icon name="alert" size={25} />
+          </span>
+          <div>
+            <h2>AI 맞춤 레시피를 만들지 못했어요</h2>
+            <p className="text-xs">{errorMessage}</p>
+          </div>
+        </div>
+        <div
+          className={cn(
+            "mismatch-card__actions",
+            requiresLogin ? "mismatch-card__actions--single" : "",
+          )}
+        >
+          <button
+            className={cn("primary-button text-button-s")}
+            type="button"
+            onClick={requiresLogin ? onLogin : onStart}
+          >
+            {requiresLogin ? "로그인 페이지로 이동" : "다시 시도"}
           </button>
         </div>
       </section>
@@ -386,11 +432,15 @@ function RecipeDetailSkeleton() {
 
 function RecipeDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [recipe, setRecipe] = useState(null);
   const [isRecipeLoading, setIsRecipeLoading] = useState(true);
   const [recipeError, setRecipeError] = useState("");
   const [analysisState, setAnalysisState] = useState("before");
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisError, setAnalysisError] = useState("");
+  const [analysisRequiresLogin, setAnalysisRequiresLogin] = useState(false);
+  const [aiCustomRecipe, setAiCustomRecipe] = useState(null);
   const [isSimpleRecipeOpen, setIsSimpleRecipeOpen] = useState(false);
   const [simpleRecipeStep, setSimpleRecipeStep] = useState(0);
   const [isConditionModalOpen, setIsConditionModalOpen] = useState(false);
@@ -452,17 +502,41 @@ function RecipeDetailPage() {
     .filter(step => step.step_type === "brief")
     .sort((a, b) => a.step_number - b.step_number)
     .map(step => step.description);
-  const adaptedSteps = steps.map((step, index) => {
-    if (index === 0) {
-      return "김치는 3cm 두께로 큼직하게 썰고, 양파는 2cm 두께로 굵게 채 썰어주세요. 대파와 청양고추는 1cm 간격으로 송송 썰고, 느타리버섯은 먹기 좋게 찢어주세요.";
-    }
-    if (index === 1) {
-      return "중불로 예열한 냄비에 식용유를 두르고, 느타리버섯을 넣어 2~3분 동안 볶아주세요. 버섯의 수분이 어느 정도 날아가고 살짝 노릇해질 때까지 볶아주세요.";
-    }
-    return step;
+  const aiIngredients = (aiCustomRecipe?.ingredients ?? []).map(item => {
+    const original = item.replacement
+      ? ingredients.find(ingredient => ingredient.id === item.replacement.originalIngredientId)
+      : null;
+
+    return {
+      id: item.ingredientId,
+      name: item.name,
+      amount: item.amount,
+      categoryId: item.categoryId,
+      original: original ?? undefined,
+      replacement: item.replacement?.reason,
+    };
   });
-  const displayedSteps = isComplete ? adaptedSteps : steps;
-  const simpleModalSteps = isComplete ? adaptedSteps : briefSteps.length > 0 ? briefSteps : steps;
+  const displayedIngredients = isComplete && aiCustomRecipe ? aiIngredients : ingredients;
+  const aiDetailSteps = (aiCustomRecipe?.steps?.detail ?? []).map(step => step.description);
+  const aiBriefSteps = (aiCustomRecipe?.steps?.brief ?? []).map(step => step.description);
+  const displayedSteps = isComplete && aiCustomRecipe ? aiDetailSteps : steps;
+  const simpleModalSteps =
+    isComplete && aiCustomRecipe
+      ? aiBriefSteps.length > 0
+        ? aiBriefSteps
+        : aiDetailSteps
+      : briefSteps.length > 0
+        ? briefSteps
+        : steps;
+  const displayedRecipe = isComplete && aiCustomRecipe
+    ? {
+        ...recipe,
+        title: aiCustomRecipe.title,
+        description: aiCustomRecipe.description,
+        servings: aiCustomRecipe.servings,
+        cooking_time: aiCustomRecipe.cookingTime,
+      }
+    : recipe;
 
   useEffect(() => {
     let isActive = true;
@@ -495,7 +569,8 @@ function RecipeDetailPage() {
 
       setIsRecipeLoading(true);
       setRecipeError("");
-      const { data, error } = await supabase
+      try {
+        const { data, error } = await supabase
         .from("recipes")
         .select(
           `
@@ -525,21 +600,30 @@ function RecipeDetailPage() {
         .eq("id", id)
         .maybeSingle();
 
-      if (!isActive) return;
-      if (error) {
+        if (!isActive) return;
+        if (error) {
         console.error("[HankkiLab] Recipe detail error:", error);
         setRecipeError("레시피를 불러오지 못했습니다.");
-      } else if (!data) {
+        } else if (!data) {
         setRecipeError("존재하지 않는 레시피입니다.");
-      } else {
+        } else {
         setRecipe(data);
         setAnalysisState("before");
+        setAnalysisProgress(0);
+        setAnalysisError("");
+        setAiCustomRecipe(null);
         setSimpleRecipeStep(0);
         setRecipeQuestion("");
         setQuestionMessages([]);
-        void recordLoadedRecipeView(data.id);
+          void recordLoadedRecipeView(data.id);
+        }
+      } catch (error) {
+        if (!isActive) return;
+        console.error("[HankkiLab] Recipe detail request failed:", error);
+        setRecipeError("레시피를 불러오지 못했습니다.");
+      } finally {
+        if (isActive) setIsRecipeLoading(false);
       }
-      setIsRecipeLoading(false);
     }
 
     loadRecipe();
@@ -553,10 +637,11 @@ function RecipeDetailPage() {
 
     async function loadConditionOptions() {
       setIsConditionDataLoading(true);
-      const [allergensResult, veganTypesResult, mappingsResult, restrictionsResult] =
+      try {
+        const [allergensResult, veganTypesResult, mappingsResult, restrictionsResult] =
         await Promise.all([
         supabase.from("allergens").select("id, name").order("name"),
-        supabase.from("vegan_types").select("id, name, description").order("name"),
+        supabase.from("vegan_types").select("id, name, description"),
         supabase.from("allergen_category_mappings").select("*"),
         supabase.from("vegan_type_restrictions").select("*"),
       ]);
@@ -575,11 +660,17 @@ function RecipeDetailPage() {
       }
 
       setAllergyOptions(allergensResult.data ?? []);
-      setVeganOptions(veganTypesResult.data ?? []);
+      setVeganOptions(sortVeganTypes(veganTypesResult.data ?? []));
       setAllergenCategoryMappings(mappingsResult.data ?? []);
       setVeganTypeRestrictions(restrictionsResult.data ?? []);
       setConditionOptionsError("");
-      setIsConditionDataLoading(false);
+        setIsConditionDataLoading(false);
+      } catch (error) {
+        if (!isActive) return;
+        console.error("[HankkiLab] Condition options request failed:", error);
+        setConditionOptionsError("조건 목록을 불러오지 못했습니다.");
+        setIsConditionDataLoading(false);
+      }
     }
 
     loadConditionOptions();
@@ -593,8 +684,8 @@ function RecipeDetailPage() {
 
     async function loadUserConditions() {
       setIsUserConditionsLoading(true);
-
-      const {
+      try {
+        const {
         data: { session },
         error: sessionError,
       } = await supabase.auth.getSession();
@@ -669,7 +760,12 @@ function RecipeDetailPage() {
       setAppliedVeganTypeId(profileResult.data?.vegan_type_id ?? null);
       setDraftAllergies(allergies);
       setDraftVeganType(veganType);
-      setIsUserConditionsLoading(false);
+        setIsUserConditionsLoading(false);
+      } catch (error) {
+        if (!isActive) return;
+        console.error("[HankkiLab] User conditions request failed:", error);
+        setIsUserConditionsLoading(false);
+      }
     }
 
     loadUserConditions();
@@ -679,16 +775,43 @@ function RecipeDetailPage() {
   }, []);
 
   useEffect(() => {
+    if (isRecipeLoading || isUserConditionsLoading || recipe?.id !== id) return undefined;
+
+    let isActive = true;
+
+    async function loadCachedCustomRecipe() {
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!session || !isActive) return;
+
+        const result = await getCachedCustomRecipe(id);
+        if (!isActive || !result?.customRecipe) return;
+
+        setAiCustomRecipe(result.customRecipe);
+        setAnalysisError("");
+        setAnalysisProgress(100);
+        setAnalysisState("complete");
+      } catch (error) {
+        if (isActive) {
+          console.warn("[HankkiLab] Cached custom recipe load failed:", error);
+        }
+      }
+    }
+
+    void loadCachedCustomRecipe();
+    return () => {
+      isActive = false;
+    };
+  }, [id, isRecipeLoading, isUserConditionsLoading, recipe?.id]);
+
+  useEffect(() => {
     if (analysisState !== "analyzing") return undefined;
     const timer = window.setInterval(() => {
-      setAnalysisProgress(currentProgress => {
-        const nextProgress = Math.min(currentProgress + 10, 100);
-        if (nextProgress === 100) {
-          window.clearInterval(timer);
-          window.setTimeout(() => setAnalysisState("complete"), 350);
-        }
-        return nextProgress;
-      });
+      setAnalysisProgress(currentProgress => Math.min(currentProgress + 5, 90));
     }, 280);
     return () => window.clearInterval(timer);
   }, [analysisState]);
@@ -735,9 +858,62 @@ function RecipeDetailPage() {
     };
   }, [isMoreInfoOpen]);
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
+    if (analysisState === "analyzing") return;
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error("[HankkiLab] AI recipe session check error:", sessionError);
+    }
+
+    if (!session?.user) {
+      setAnalysisProgress(0);
+      setAnalysisError("AI 맞춤 레시피 기능을 사용할 수 없습니다. 로그인 후 이용해 주세요.");
+      setAnalysisRequiresLogin(true);
+      setAnalysisState("error");
+      return;
+    }
+
+    if (aiCustomRecipe) {
+      setAnalysisProgress(100);
+      setAnalysisState("complete");
+      return;
+    }
+
     setAnalysisProgress(0);
+    setAnalysisError("");
+    setAnalysisRequiresLogin(false);
     setAnalysisState("analyzing");
+
+    try {
+      const result = await generateCustomRecipe(id);
+
+      if (result?.status === "replacement_not_required") {
+        setAnalysisProgress(0);
+        setAnalysisState("before");
+        return;
+      }
+
+      if (!result?.customRecipe) {
+        throw new Error("AI 맞춤 레시피 응답이 올바르지 않습니다.");
+      }
+
+      setAiCustomRecipe(result.customRecipe);
+      setAnalysisProgress(100);
+      setAnalysisState("complete");
+    } catch (error) {
+      console.error("[HankkiLab] Custom recipe generation error:", error);
+      setAnalysisError(
+        error instanceof Error ? error.message : "AI 맞춤 레시피를 만들지 못했습니다.",
+      );
+      setAnalysisRequiresLogin(false);
+      setAnalysisProgress(0);
+      setAnalysisState("error");
+    }
   };
 
   const showOriginalRecipe = () => {
@@ -781,6 +957,8 @@ function RecipeDetailPage() {
     setAppliedVeganTypeId(
       veganOptions.find(veganType => veganType.name === draftVeganType)?.id ?? null,
     );
+    setAiCustomRecipe(null);
+    setAnalysisError("");
     setAnalysisProgress(0);
     setAnalysisState("before");
     setIsConditionModalOpen(false);
@@ -799,11 +977,12 @@ function RecipeDetailPage() {
     setRecipeQuestion("");
     setIsQuestionLoading(true);
 
-    const {
+    try {
+      const {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session) {
+      if (!session) {
       setQuestionMessages(current => [
         ...current,
         {
@@ -812,19 +991,18 @@ function RecipeDetailPage() {
           status: "error",
         },
       ]);
-      setIsQuestionLoading(false);
-      return;
-    }
+        return;
+      }
 
-    const { data, error } = await supabase.functions.invoke("answer-recipe-question", {
-      body: {
-        recipeId: recipe.id,
-        question,
-        conversation: previousConversation,
-      },
-    });
+      const { data, error } = await supabase.functions.invoke("answer-recipe-question", {
+        body: {
+          recipeId: recipe.id,
+          question,
+          conversation: previousConversation,
+        },
+      });
 
-    if (error) {
+      if (error) {
       console.error("[HankkiLab] Recipe question error:", error);
       setQuestionMessages(current => [
         ...current,
@@ -834,7 +1012,7 @@ function RecipeDetailPage() {
           status: "error",
         },
       ]);
-    } else if (!data?.answer) {
+      } else if (!data?.answer) {
       setQuestionMessages(current => [
         ...current,
         {
@@ -843,11 +1021,22 @@ function RecipeDetailPage() {
           status: "error",
         },
       ]);
-    } else {
-      setQuestionMessages(current => [...current, { role: "assistant", content: data.answer }]);
+      } else {
+        setQuestionMessages(current => [...current, { role: "assistant", content: data.answer }]);
+      }
+    } catch (error) {
+      console.error("[HankkiLab] Recipe question request failed:", error);
+      setQuestionMessages(current => [
+        ...current,
+        {
+          role: "assistant",
+          content: "답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+          status: "error",
+        },
+      ]);
+    } finally {
+      setIsQuestionLoading(false);
     }
-
-    setIsQuestionLoading(false);
   };
 
   if (isRecipeLoading || isUserConditionsLoading || isConditionDataLoading) {
@@ -892,10 +1081,14 @@ function RecipeDetailPage() {
             <AnalysisPanel
               analysisState={analysisState}
               progress={analysisProgress}
+              errorMessage={analysisError}
+              replacementCount={aiIngredients.filter(ingredient => ingredient.replacement).length}
               mismatchedIngredients={mismatchedIngredients}
               onStart={startAnalysis}
               onCompare={showOriginalRecipe}
               onMoreInfo={() => setIsMoreInfoOpen(true)}
+              requiresLogin={analysisRequiresLogin}
+              onLogin={() => navigate("/login")}
             />
 
             <div className={cn("safety-notice")}>
@@ -925,21 +1118,13 @@ function RecipeDetailPage() {
                   <li
                     key={step}
                     className={cn(
-                      isComplete && index < 2 ? "step--replaced" : "",
+                      isComplete ? "step--replaced" : "",
                       "column-gap-3 py-3",
                     )}
                   >
                     <span>{index + 1}</span>
                     <div>
                       <p className="text-xs">{step}</p>
-                      {isComplete && index < 2 && (
-                        <small className={cn("column-gap-3 mt-2 px-3 py-2 text-xs")}>
-                          <b className="text-button-xs">↻ 대체됨</b>
-                          {index === 0
-                            ? "느타리버섯은 물에 오래 씻으면 수분을 많이 흡수할 수 있으므로 가볍게 닦아 사용하세요."
-                            : "느타리버섯을 살짝 노릇해질 때까지 볶으면 돼지고기 없이도 씹는 식감과 감칠맛을 더할 수 있습니다."}
-                        </small>
-                      )}
                     </div>
                   </li>
                 ))}
@@ -1018,16 +1203,16 @@ function RecipeDetailPage() {
 
           <div className={cn("recipe-detail__side")}>
             <section className={cn("recipe-summary")}>
-              <h1>{recipe.title}</h1>
-              <p className="text-s">{recipe.description}</p>
+              <h1>{displayedRecipe.title}</h1>
+              <p className="text-s">{displayedRecipe.description}</p>
               <div className={cn("recipe-summary__meta")}>
                 <span>
                   <Icon name="user" size={16} />
-                  {recipe.servings}인분
+                  {displayedRecipe.servings}인분
                 </span>
                 <span>
                   <Icon name="clock" size={16} />
-                  {recipe.cooking_time}분
+                  {displayedRecipe.cooking_time}분
                 </span>
                 <span className={cn("safe-badge", difficultyColorClass)}>{difficultyLabel}</span>
                 <span className={cn("favorite-count")}>
@@ -1068,7 +1253,7 @@ function RecipeDetailPage() {
                 </button>
               </div>
             </section>
-            <IngredientPanel isComplete={isComplete} ingredients={ingredients} />
+            <IngredientPanel ingredients={displayedIngredients} />
           </div>
         </div>
       </main>
@@ -1110,28 +1295,42 @@ function RecipeDetailPage() {
                 </span>
                 분류 기준에 맞는 대체재
               </h3>
-              <div className={cn("more-info-card")}>
-                <div className={cn("more-info-replacement")}>
-                  <div className={cn("more-info-original text-xs")}>
-                    <del>돼지고기 앞다리살</del>
-                    <del>3/5컵 (100g)</del>
-                  </div>
-                  <span className={cn("more-info-status more-info-status--safe text-button-xs")}>
-                    <Icon name="check" size={12} />
-                    대체가능
-                  </span>
-                  <div className={cn("more-info-new-ingredient text-button-s")}>
-                    <strong>느타리버섯</strong>
-                    <span className="text-xs">200g</span>
-                  </div>
+              {isComplete && aiCustomRecipe ? (
+                displayedIngredients
+                  .filter(ingredient => ingredient.replacement)
+                  .map(ingredient => (
+                    <div className={cn("more-info-card")} key={ingredient.id}>
+                      <div className={cn("more-info-replacement")}>
+                        <div className={cn("more-info-original text-xs")}>
+                          <del>{ingredient.original?.name}</del>
+                          <del>{ingredient.original?.amount}</del>
+                        </div>
+                        <span
+                          className={cn("more-info-status more-info-status--safe text-button-xs")}
+                        >
+                          <Icon name="check" size={12} />
+                          대체완료
+                        </span>
+                        <div className={cn("more-info-new-ingredient text-button-s")}>
+                          <strong>{ingredient.name}</strong>
+                          <span className="text-xs">{ingredient.amount}</span>
+                        </div>
+                      </div>
+                      <p className={cn("more-info-reason text-button-xs")}>
+                        <span className="material-symbols-outlined" aria-hidden="true">
+                          refresh
+                        </span>
+                        {ingredient.replacement}
+                      </p>
+                    </div>
+                  ))
+              ) : (
+                <div className={cn("more-info-card")}>
+                  <p className={cn("more-info-reason text-button-xs")}>
+                    AI 맞춤 레시피를 만들면 대체 재료와 이유를 확인할 수 있습니다.
+                  </p>
                 </div>
-                <p className={cn("more-info-reason text-button-xs")}>
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    refresh
-                  </span>
-                  돼지고기 알레르기 + 비건 대체
-                </p>
-              </div>
+              )}
             </section>
 
             <section className={cn("more-info-section more-info-section--check")}>
@@ -1335,7 +1534,7 @@ function RecipeDetailPage() {
             >
               <div>
                 <h2 id="simple-recipe-title" className={cn("mb-2 text-title-m")}>
-                  {recipe.title}
+                  {displayedRecipe.title}
                 </h2>
                 <p className={cn("m-0")}>간단 레시피 · {simpleModalSteps.length}단계</p>
               </div>

@@ -71,9 +71,21 @@ function MyPage() {
   const [recentRecipes, setRecentRecipes] = useState([]);
   const [nickname, setNickname] = useState("");
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawFailed, setWithdrawFailed] = useState(false);
+  const [showWithdrawToast, setShowWithdrawToast] = useState(false);
   const [isDietLoading, setIsDietLoading] = useState(true);
   const [isEditingDiet, setIsEditingDiet] = useState(false);
   const [isSavingDiet, setIsSavingDiet] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  useEffect(() => {
+    if (authLoading || authUser || isWithdrawing || showWithdrawToast) {
+      return;
+    }
+    navigate("/login");
+  }, [authUser, authLoading, isWithdrawing, showWithdrawToast, navigate]);
 
   useEffect(() => {
     if (authLoading) {
@@ -82,6 +94,7 @@ function MyPage() {
 
     if (!authUser) {
       setNickname("");
+      setPhotoUrl(null);
       setIsProfileLoading(false);
       return;
     }
@@ -92,7 +105,7 @@ function MyPage() {
     async function loadProfile() {
       const { data, error } = await supabase
         .from("profiles")
-        .select("nickname")
+        .select("nickname, profile_image_url")
         .eq("id", authUser.id)
         .maybeSingle();
       if (!isActive) return;
@@ -102,6 +115,7 @@ function MyPage() {
         return;
       }
       setNickname(data?.nickname ?? "");
+      setPhotoUrl(data?.profile_image_url ?? null);
       setIsProfileLoading(false);
     }
 
@@ -229,6 +243,43 @@ function MyPage() {
     navigate(`/recipes/${id}`);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
+
+  const openWithdrawModal = () => {
+    setWithdrawFailed(false);
+    setIsWithdrawModalOpen(true);
+  };
+
+  const closeWithdrawModal = () => {
+    if (isWithdrawing) return;
+    setWithdrawFailed(false);
+    setIsWithdrawModalOpen(false);
+  };
+
+  const handleWithdraw = async () => {
+    if (isWithdrawing) return;
+    setIsWithdrawing(true);
+    setWithdrawFailed(false);
+    try {
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+
+      setIsWithdrawModalOpen(false);
+      setShowWithdrawToast(true);
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        navigate("/");
+      }, 1200);
+    } catch (error) {
+      console.error("[MyPage] 회원 탈퇴 실패", error);
+      setWithdrawFailed(true);
+      setIsWithdrawing(false);
+    }
+  };
+
   const toggleRecentFavorite = async (id, event) => {
     event.stopPropagation();
     if (!authUser) return;
@@ -265,10 +316,69 @@ function MyPage() {
     );
   };
 
-  const handlePhotoChange = event => {
+  const handlePhotoChange = async event => {
     const file = event.target.files[0];
-    if (!file) return;
-    setPhotoUrl(URL.createObjectURL(file));
+    event.target.value = "";
+    if (!file || !authUser || isUploadingPhoto) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const extension = file.name.split(".").pop() || "jpg";
+      const path = `${authUser.id}/profile.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("profile_images")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("profile_images")
+        .getPublicUrl(path);
+      const freshUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ profile_image_url: freshUrl })
+        .eq("id", authUser.id);
+      if (updateError) throw updateError;
+
+      setPhotoUrl(freshUrl);
+    } catch (error) {
+      console.error("[MyPage] 프로필 사진 업로드 실패", error);
+      alert("프로필 사진을 업로드하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    if (!authUser || !photoUrl || isUploadingPhoto) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const marker = "/profile_images/";
+      const markerIndex = photoUrl.indexOf(marker);
+      if (markerIndex !== -1) {
+        const path = photoUrl.slice(markerIndex + marker.length).split("?")[0];
+        const { error: removeError } = await supabase.storage
+          .from("profile_images")
+          .remove([path]);
+        if (removeError) console.error("[MyPage] 스토리지 파일 삭제 실패", removeError);
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ profile_image_url: null })
+        .eq("id", authUser.id);
+      if (error) throw error;
+
+      setPhotoUrl(null);
+    } catch (error) {
+      console.error("[MyPage] 프로필 사진 삭제 실패", error);
+      alert("프로필 사진을 삭제하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const toggleAllergy = allergenId => {
@@ -362,15 +472,39 @@ function MyPage() {
 
         <section className={styles.profileCard}>
           <div className={styles.profileCardLeft}>
-            <label
-              className={`${styles.profileCardAvatar} ${photoUrl ? "" : styles.profileCardAvatarEmpty}`}
-            >
-              {photoUrl && <img src={photoUrl} alt="프로필 사진" />}
-              <span className={`material-icons ${styles.profileCardAvatarEdit}`} aria-hidden="true">
-                photo_camera
-              </span>
-              <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-            </label>
+            <div className={styles.profileCardAvatarWrap}>
+              <label
+                className={`${styles.profileCardAvatar} ${photoUrl ? "" : styles.profileCardAvatarEmpty}`}
+              >
+                {photoUrl && <img src={photoUrl} alt="프로필 사진" />}
+                <span
+                  className={`material-icons ${styles.profileCardAvatarEdit}`}
+                  aria-hidden="true"
+                >
+                  photo_camera
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  disabled={isUploadingPhoto}
+                  className="hidden"
+                />
+              </label>
+              {photoUrl && (
+                <button
+                  type="button"
+                  className={styles.profileCardAvatarDelete}
+                  onClick={handleDeletePhoto}
+                  disabled={isUploadingPhoto}
+                  aria-label="프로필 사진 삭제"
+                >
+                  <span className="material-icons" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+              )}
+            </div>
 
             <div className={styles.profileCardText}>
               {!isProfileLoading && (
@@ -608,12 +742,11 @@ function MyPage() {
             {recentRecipes.map(recipe => {
               const isFavorite = favoriteRecipeIds.has(recipe.id);
               return (
-                <div
-                  key={recipe.id}
-                  className={styles.recentCardItem}
-                  onClick={() => goToRecipeDetail(recipe.id)}
-                >
-                  <div className={styles.recentImageWrap}>
+                <div key={recipe.id} className={styles.recentCardItem}>
+                  <div
+                    className={styles.recentImageWrap}
+                    onClick={() => goToRecipeDetail(recipe.id)}
+                  >
                     <img src={recipe.imageUrl} alt={recipe.name} className={styles.recentImage} />
                     <span
                       className={`${styles.recentDifficulty} ${
@@ -634,7 +767,12 @@ function MyPage() {
                     </button>
                   </div>
                   <div className={styles.recentInfo}>
-                    <p className={styles.recentName}>{recipe.name}</p>
+                    <p
+                      className={styles.recentName}
+                      onClick={() => goToRecipeDetail(recipe.id)}
+                    >
+                      {recipe.name}
+                    </p>
                     <div className={styles.recentMeta}>
                       <span className={styles.recentMetaItem}>
                         <span className="material-icons" aria-hidden="true">
@@ -662,6 +800,80 @@ function MyPage() {
           </div>
         </section>
         )}
+
+        <div className={styles.accountActions}>
+          <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+            로그아웃
+          </button>
+          <button type="button" className={styles.withdrawBtn} onClick={openWithdrawModal}>
+            회원 탈퇴
+          </button>
+        </div>
+
+        {isWithdrawModalOpen && (
+          <div className={styles.modalBackdrop} onClick={closeWithdrawModal}>
+            <div className={styles.modalBox} onClick={event => event.stopPropagation()}>
+              <span className={`material-icons ${styles.modalIconCircle}`} aria-hidden="true">
+                warning
+              </span>
+              <p className={styles.modalTitle}>정말 탈퇴하시겠어요?</p>
+              <p
+                className={`${styles.modalDesc}${withdrawFailed ? ` ${styles.modalDescFailed}` : ""}`}
+              >
+                {withdrawFailed ? (
+                  "처리 중 오류가 발생했어요. 다시 시도해주세요."
+                ) : (
+                  <>
+                    회원 탈퇴 시 저장된 알레르기 정보, 즐겨찾기, AI 질문 기록 등
+                    <br />
+                    모든 데이터가{" "}
+                    <span className={styles.modalDescEmphasis}>영구적으로 삭제</span>되며 복구할 수
+                    없습니다.
+                  </>
+                )}
+              </p>
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalCancelBtn}
+                  onClick={closeWithdrawModal}
+                  disabled={isWithdrawing}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  className={styles.modalConfirmBtn}
+                  onClick={handleWithdraw}
+                  disabled={isWithdrawing}
+                >
+                  {isWithdrawing ? (
+                    <span className={styles.processingLabel}>
+                      처리 중
+                      <span className={styles.processingDots}>
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </span>
+                  ) : withdrawFailed ? (
+                    "다시 시도"
+                  ) : (
+                    "회원 탈퇴"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div
+          className={`${styles.withdrawToast}${showWithdrawToast ? ` ${styles.withdrawToastShow}` : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          탈퇴 완료
+        </div>
       </div>
     </div>
   );
