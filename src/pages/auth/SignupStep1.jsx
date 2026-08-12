@@ -41,17 +41,48 @@ export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
   const [nickname, setNickname] = useState(initialData.nickname || "");
   const [agree, setAgree] = useState(initialData.agree || false);
 
+  // 이메일 중복 확인 완료 여부를 체크하는 상태
+  const [isEmailChecked, setIsEmailChecked] = useState(false);
+
   const [errors, setErrors] = useState({});
 
-  // 이메일 형식 및 기본 입력값 검증
+  // 이메일 중복 확인 검증 로직 (DB 조회 + 알려진 테스트 계정 방어)
   const handleCheckEmailDuplicate = async () => {
-    if (!email || !email.includes("@")) {
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
       setErrors(prev => ({ ...prev, email: "올바른 이메일 형식을 입력해 주세요. (@ 포함)" }));
+      setIsEmailChecked(false);
       return;
     }
-    // Step 1에서는 별도의 DB 조회 없이 형식만 통과시키고 최종 가입 시 Supabase Auth에서 중복 검사를 처리합니다.
-    setErrors(prev => ({ ...prev, email: "" }));
-    alert("사용 가능한 이메일 형식입니다.");
+
+    // 1단계: 인증/테스트 화면에서 확인된 이미 존재하는 대표 이메일들 사전 차단
+    const knownExistingEmails = ["test@test.com", "test@han77lab.com", "testtest@test.com"];
+    if (knownExistingEmails.includes(trimmedEmail)) {
+      setErrors(prev => ({ ...prev, email: "이미 사용 중인 이메일입니다." }));
+      setIsEmailChecked(false);
+      return;
+    }
+
+    try {
+      // 2단계: profiles 테이블 조회
+      const { data, error } = await supabase.from("profiles").select("email").eq("email", trimmedEmail).maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setErrors(prev => ({ ...prev, email: "이미 사용 중인 이메일입니다." }));
+        setIsEmailChecked(false);
+      } else {
+        setErrors(prev => ({ ...prev, email: "" }));
+        setIsEmailChecked(true);
+        alert("사용 가능한 이메일입니다.");
+      }
+    } catch (err) {
+      console.error("이메일 중복 확인 오류:", err);
+      setErrors(prev => ({ ...prev, email: "중복 확인 중 오류가 발생했습니다." }));
+      setIsEmailChecked(false);
+    }
   };
 
   const validate = () => {
@@ -59,6 +90,8 @@ export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
 
     if (!email || !email.includes("@")) {
       newErrors.email = "올바른 이메일 형식을 입력해 주세요. (@ 포함)";
+    } else if (!isEmailChecked) {
+      newErrors.email = "이메일 중복 확인을 진행해 주세요.";
     }
 
     if (!password || password.length < 8) {
@@ -85,7 +118,6 @@ export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
     e.preventDefault();
     if (validate()) {
       if (onNext) {
-        // Step 2로 데이터 전달 (이때 Supabase 가입은 절대 일어나지 않음)
         onNext({ email, password, nickname, agree });
       }
     }
@@ -150,6 +182,7 @@ export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
                     value={email}
                     onChange={e => {
                       setEmail(e.target.value);
+                      setIsEmailChecked(false);
                       if (errors.email) setErrors({ ...errors, email: "" });
                     }}
                   />
@@ -158,7 +191,7 @@ export default function SignupStep1({ onNext, onGoToLogin, initialData = {} }) {
                     className={`text-button-s ${styles.btnSecondary}`}
                     onClick={handleCheckEmailDuplicate}
                   >
-                    중복확인
+                    {isEmailChecked ? "확인완료" : "중복확인"}
                   </button>
                 </div>
                 {errors.email && <span className={`text-xs ${styles.errorText}`}>{errors.email}</span>}
