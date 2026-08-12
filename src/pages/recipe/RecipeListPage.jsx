@@ -12,8 +12,20 @@ import {
   addFavorite,
   removeFavorite,
 } from "../../services/favoriteService";
+import { 
+  getUserSafetyConditions,
+  getRecipeSafetyStatus,
+ } from "../../utils/recipeSafety";
+
 
 const RECIPE_LOAD_COUNT = 6;
+
+const CARD_STATUS_MAP = {
+  safe: "safe",
+  danger: "warning",
+  needReplacement: "replaceable",
+};
+
 const SORT_OPTIONS = [
   { value: "created", label: "등록순" },
   { value: "likes", label: "좋아요순" },
@@ -31,6 +43,7 @@ function RecipeListPage() {
   const [veganFilter, setVeganFilter] = useState("일반");
   const [allergyFilters, setAllergyFilters] = useState({});
   const [favoriteRecipeIds, setFavoriteRecipeIds] = useState(() => new Set());
+  const [safetyConditions, setSafetyConditions] = useState(null);
 
 
   useEffect(() => {
@@ -144,33 +157,80 @@ setRecipes(prev =>
 );
 };
 
+const warningAllergyNames = Object.entries(allergyFilters)
+  .filter(([,state]) => state === "warning")
+  .map(([name])=>name);
+const warningAllergenIds = (
+  safetyConditions?.allergyOptions ?? []
+)
+  .filter(allergen =>
+    warningAllergyNames.includes(allergen.name),
+  )
+  .map(allergen => allergen.id);
+
+
+
+const effectiveConditions = safetyConditions
+  ? {
+      ...safetyConditions,
+      allergenIds: [
+        ...new Set([
+          ...(safetyConditions.allergenIds ?? []).map(String),
+          ...warningAllergenIds.map(String),
+        ]),
+      ],
+    }
+  : null;
+
 const allergyFilteredRecipes = filterRecipesByAllergies(recipes, allergyFilters);
 const filteredRecipes = filterRecipesByVeganType(allergyFilteredRecipes, veganFilter);
 
-const visibleRecipes = filteredRecipes.slice(0, visibleCount);
-const hasMoreRecipes = visibleCount < filteredRecipes.length;
+const recipesWithStatus = filteredRecipes.map(recipe => {
+  const safetyStatus = getRecipeSafetyStatus(
+    recipe,
+    effectiveConditions,
+  );
+
+  return {
+    ...recipe,
+    status:
+      CARD_STATUS_MAP[safetyStatus.safetyType] ?? "safe",
+  };
+});
+
+const visibleRecipes = recipesWithStatus.slice(0, visibleCount);
+const hasMoreRecipes = visibleCount < recipesWithStatus.length;
 
 
 useEffect(() => {
-    async function loadRecipes() {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
+  if (authLoading) return;
 
-        const recipes = await getRecips(sortType);
-        setRecipes(recipes);
-        setVisibleCount(RECIPE_LOAD_COUNT);
-      } catch (error) {
-        console.error("[HankkiLab] 레시피 조회 실패", error);
-        setErrorMessage("레시피 목록을 불러오지 못했습니다.");
-        return;
-      }finally{
-        setIsLoading(false);
-      }
+  async function loadRecipes() {
+    try {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      const [loadedRecipes, conditions] = await Promise.all([
+        getRecips(sortType),
+        authUser
+          ? getUserSafetyConditions(authUser.id)
+          : Promise.resolve(null),
+      ]);
+
+      
+      setRecipes(loadedRecipes);
+      setSafetyConditions(conditions);
+      setVisibleCount(RECIPE_LOAD_COUNT);
+    } catch (error) {
+      console.error("[HankkiLab] 레시피 조회 실패", error);
+      setErrorMessage("레시피 목록을 불러오지 못했습니다.");
+    } finally {
+      setIsLoading(false);
     }
+  }
 
-    loadRecipes();
-  },[sortType]);
+  loadRecipes();
+}, [sortType, authUser, authLoading]);
 
   const handleLoadMore = () =>{
     setVisibleCount(prevCount => prevCount + RECIPE_LOAD_COUNT);
@@ -181,6 +241,7 @@ useEffect(() => {
   };
 
 
+  
 
   return (
     <div className={style.main}>
@@ -232,6 +293,7 @@ useEffect(() => {
           time={recipe.cooking_time}
           serves={recipe.servings}
           likes={recipe.likes ?? 0}
+          status={recipe.status}
           isFavorite={favoriteRecipeIds.has(recipe.id)}
           onFavoriteClick={() => handleFavoriteClick(recipe.id)}
           />

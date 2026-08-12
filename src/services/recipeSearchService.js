@@ -44,6 +44,7 @@ export async function getRecips(sortType = "created") {
       created_at,
       recipe_ingredients (
         ingredients (
+          name,
           category_id
         )
       )
@@ -64,9 +65,11 @@ export async function getRecips(sortType = "created") {
     difficulty: recipe.difficulty,
     created_at: recipe.created_at,
     likes: favoriteCounts[recipe.id] ?? 0,
-    categoryIds: recipe.recipe_ingredients
-      ?.map(item => item.ingredients?.category_id)
-      .filter(Boolean) ?? [],
+    recipe_ingredients: recipe.recipe_ingredients ?? [],
+    categoryIds:
+      recipe.recipe_ingredients
+        ?.map(item => item.ingredients?.category_id)
+        .filter(Boolean) ?? [],
   }));
 
   return sortRecipes(recipes, sortType);
