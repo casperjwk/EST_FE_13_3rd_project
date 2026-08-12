@@ -21,10 +21,10 @@
   margin-bottom: 10px;
 }
 
-.sectionTitleP{
+.sectionTitleP {
   color: var(--secondary);
 }
-.sectionSpan{
+.sectionSpan {
   color: var(--gray-3);
 }
 
@@ -61,7 +61,7 @@
   color: var(--primary);
 }
 
-.filterContent{
+.filterContent {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
@@ -72,7 +72,7 @@
 .filterContent > * {
   min-height: 0;
 }
-.filterContent .filterBox{
+.filterContent .filterBox {
   overflow: hidden;
 }
 
@@ -93,8 +93,7 @@
   margin-top: 12px;
 }
 
-.resetChip
-{
+.resetChip {
   height: 24px;
   padding: 0 10px;
   border-radius: 999px;
@@ -111,20 +110,19 @@
 .veganSelected {
   border-color: var(--primary);
   color: var(--primary);
-} 
+}
 
-.sort{
+.sort {
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
-/* 반응형 */ 
+/* 반응형 */
 
-@media (max-width:767px) {
-  .sectionTitle{
+@media (max-width: 767px) {
+  .sectionTitle {
     flex-direction: column;
     align-items: normal;
   }
-
 }
