@@ -6,7 +6,12 @@ import styles from "./RecipeDetailPage.module.css";
 import "material-icons/iconfont/filled.css";
 import { recordRecipeView } from "../../services/recentViewService";
 import { generateCustomRecipe, getCachedCustomRecipe } from "../../services/aiRecipeService";
-import { addFavorite, getFavoriteRecipeIds, removeFavorite } from "../../services/favoriteService";
+import {
+  addFavorite,
+  getFavoriteCounts,
+  getFavoriteRecipeIds,
+  removeFavorite,
+} from "../../services/favoriteService";
 
 const VEGAN_TYPE_ORDER = [
   "general",
@@ -457,6 +462,7 @@ function RecipeDetailPage() {
   const [isUserConditionsLoading, setIsUserConditionsLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteUpdating, setIsFavoriteUpdating] = useState(false);
+  const [favoriteCount, setFavoriteCount] = useState(0);
   const [recipeQuestion, setRecipeQuestion] = useState("");
   const [questionMessages, setQuestionMessages] = useState([]);
   const [isQuestionLoading, setIsQuestionLoading] = useState(false);
@@ -632,6 +638,29 @@ function RecipeDetailPage() {
     }
 
     loadRecipe();
+    return () => {
+      isActive = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadFavoriteCount() {
+      if (!id) return;
+
+      try {
+        const counts = await getFavoriteCounts([id]);
+        if (isActive) {
+          setFavoriteCount(Number(counts[id] ?? 0));
+        }
+      } catch (error) {
+        console.error("[HankkiLab] Favorite count load error:", error);
+      }
+    }
+
+    void loadFavoriteCount();
+
     return () => {
       isActive = false;
     };
@@ -977,13 +1006,16 @@ function RecipeDetailPage() {
     setIsFavoriteUpdating(true);
 
     try {
+      const wasFavorite = isFavorite;
+
       if (isFavorite) {
         await removeFavorite(session.user.id, recipe.id);
       } else {
         await addFavorite(session.user.id, recipe.id);
       }
 
-      setIsFavorite(current => !current);
+      setIsFavorite(!wasFavorite);
+      setFavoriteCount(current => Math.max(0, current + (wasFavorite ? -1 : 1)));
     } catch (error) {
       console.error("[HankkiLab] Favorite update error:", error);
       alert("즐겨찾기 상태를 변경하지 못했습니다. 다시 시도해 주세요.");
@@ -1285,7 +1317,7 @@ function RecipeDetailPage() {
                 <span className={cn("safe-badge", difficultyColorClass)}>{difficultyLabel}</span>
                 <span className={cn("favorite-count")}>
                   <Icon name="heart" size={16} />
-                  10
+                  {favoriteCount}
                 </span>
                 <button
                   className={cn("favorite-button", isFavorite ? "favorite-button--active" : "")}
