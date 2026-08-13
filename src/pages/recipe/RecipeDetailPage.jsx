@@ -3,8 +3,10 @@ import { useNavigate, useParams } from "react-router";
 import Badge from "../../components/common/Badge";
 import { supabase } from "../../lib/supabase";
 import styles from "./RecipeDetailPage.module.css";
+import "material-icons/iconfont/filled.css";
 import { recordRecipeView } from "../../services/recentViewService";
 import { generateCustomRecipe, getCachedCustomRecipe } from "../../services/aiRecipeService";
+import { addFavorite, getFavoriteRecipeIds, removeFavorite } from "../../services/favoriteService";
 
 const VEGAN_TYPE_ORDER = [
   "general",
@@ -454,6 +456,7 @@ function RecipeDetailPage() {
   const [isConditionDataLoading, setIsConditionDataLoading] = useState(true);
   const [isUserConditionsLoading, setIsUserConditionsLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavoriteUpdating, setIsFavoriteUpdating] = useState(false);
   const [recipeQuestion, setRecipeQuestion] = useState("");
   const [questionMessages, setQuestionMessages] = useState([]);
   const [isQuestionLoading, setIsQuestionLoading] = useState(false);
@@ -629,6 +632,41 @@ function RecipeDetailPage() {
     }
 
     loadRecipe();
+    return () => {
+      isActive = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadFavoriteState() {
+      setIsFavorite(false);
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (!isActive) return;
+      if (sessionError) {
+        console.error("[HankkiLab] Favorite session check error:", sessionError);
+        return;
+      }
+      if (!session?.user || !id) return;
+
+      try {
+        const favoriteRecipeIds = await getFavoriteRecipeIds(session.user.id);
+        if (isActive) {
+          setIsFavorite(favoriteRecipeIds.some(recipeId => String(recipeId) === String(id)));
+        }
+      } catch (error) {
+        console.error("[HankkiLab] Favorite state load error:", error);
+      }
+    }
+
+    void loadFavoriteState();
+
     return () => {
       isActive = false;
     };
@@ -917,6 +955,41 @@ function RecipeDetailPage() {
   const showOriginalRecipe = () => {
     setAnalysisProgress(0);
     setAnalysisState("before");
+  };
+
+  const toggleFavorite = async () => {
+    if (!recipe?.id || isFavoriteUpdating) return;
+
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error("[HankkiLab] Favorite session check error:", sessionError);
+    }
+
+    if (!session?.user) {
+      alert("로그인 후 즐겨찾기 기능을 이용해 주세요.");
+      return;
+    }
+
+    setIsFavoriteUpdating(true);
+
+    try {
+      if (isFavorite) {
+        await removeFavorite(session.user.id, recipe.id);
+      } else {
+        await addFavorite(session.user.id, recipe.id);
+      }
+
+      setIsFavorite(current => !current);
+    } catch (error) {
+      console.error("[HankkiLab] Favorite update error:", error);
+      alert("즐겨찾기 상태를 변경하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsFavoriteUpdating(false);
+    }
   };
 
   const openSimpleRecipe = () => {
@@ -1219,9 +1292,19 @@ function RecipeDetailPage() {
                   type="button"
                   aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
                   aria-pressed={isFavorite}
-                  onClick={() => setIsFavorite(current => !current)}
+                  disabled={isFavoriteUpdating}
+                  onClick={toggleFavorite}
                 >
-                  <Icon name="heart" size={14} />
+                  <span
+                    className="material-icons"
+                    style={{
+                      fontSize: "14px",
+                      color: isFavorite ? "var(--white-1)" : "var(--danger)",
+                    }}
+                    aria-hidden="true"
+                  >
+                    {isFavorite ? "favorite" : "favorite_border"}
+                  </span>
                 </button>
               </div>
             </section>
