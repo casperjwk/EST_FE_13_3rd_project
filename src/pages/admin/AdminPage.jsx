@@ -4,6 +4,7 @@ import DashboardSection from "./DashboardSection";
 import UserDietSection from "./UserDietSection";
 import SystemSettingsSection from "./SystemSettingsSection";
 import styles from "./AdminPage.module.css";
+import { supabase } from "../../lib/supabase";
 
 const DashboardIcon = () => (
   <svg
@@ -53,7 +54,7 @@ const SettingsIcon = () => (
     strokeLinejoin="round"
   >
     <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </svg>
 );
 
@@ -79,30 +80,43 @@ const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const checkAdminAuth = () => {
+    const checkAdminAuth = async () => {
       try {
-        // 로컬 스토리지에 저장된 userEmail을 직접 읽어서 관리자 여부 확인
-        const userEmail = localStorage.getItem("userEmail") || "";
-        const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+        // 1. Supabase 현재 로그인 세션/유저 정보 확인
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-        console.log("현재 로컬스토리지 인증 이메일:", userEmail);
-
-        if (!isLoggedIn || !userEmail) {
+        if (userError || !user) {
           alert("로그인이 필요한 페이지입니다.");
           window.location.href = "/login";
           return;
         }
 
-        const allowedAdminEmails = ["test@han77ilab.com", "admin@han77ilab.com"];
-        if (allowedAdminEmails.includes(userEmail.trim())) {
+        console.log("현재 로그인한 유저 ID:", user.id);
+
+        // 2. Supabase admins 테이블에서 현재 유저의 ID가 등록되어 있는지 조회
+        // (만약 admins 테이블 컬럼명이 user_id가 아니라 id라면 .eq("id", user.id)로 수정해 주세요)
+        const { data: adminData, error: adminError } = await supabase
+          .from("admins")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (adminError) throw adminError;
+
+        if (adminData) {
+          // admins 테이블에 존재함 -> 관리자 승인
           setIsAuthorized(true);
         } else {
-          alert("접근 권한이 없습니다.");
+          // 존재하지 않음 -> 권한 없음
+          alert("접근 권한이 없습니다. 관리자만 접근할 수 있습니다.");
           window.location.href = "/";
         }
       } catch (err) {
-        console.error("권한 검증 오류:", err);
-        alert("접근 권한이 없습니다.");
+        console.error("관리자 권한 검증 오류:", err);
+        alert("권한 확인 중 오류가 발생했습니다.");
         window.location.href = "/";
       } finally {
         setIsLoading(false);
