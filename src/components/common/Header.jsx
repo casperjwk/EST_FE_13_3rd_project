@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 import logoImg from '../../assets/logo.svg';
 import styles from './common.module.css';
 
@@ -9,6 +10,37 @@ function Header() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
   const isLoggedIn = !!user;
+
+  const [profile, setProfile] = useState({ nickname: '', profileImageUrl: '' });
+
+  useEffect(() => {
+    if (!user) {
+      setProfile({ nickname: '', profileImageUrl: '' });
+      return;
+    }
+    let isActive = true;
+
+    supabase
+      .from('profiles')
+      .select('nickname, profile_image_url')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!isActive) return;
+        if (error) {
+          console.error('[HankkiLab] Header profile fetch error:', error);
+          return;
+        }
+        setProfile({
+          nickname: data?.nickname ?? '',
+          profileImageUrl: data?.profile_image_url ?? '',
+        });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [user]);
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -38,8 +70,16 @@ function Header() {
                 className={styles['common-header__profile']}
                 onClick={() => setProfileMenuOpen(!profileMenuOpen)}
               >
-                <div className={styles['common-header__profile-circle']}></div>
-                <span className="text-s">{user.user_metadata?.nickname}</span>
+                <div className={styles['common-header__profile-circle']}>
+                  {profile.profileImageUrl && (
+                    <img
+                      src={profile.profileImageUrl}
+                      alt="프로필 사진"
+                      className={styles['common-header__profile-img']}
+                    />
+                  )}
+                </div>
+                <span className="text-s">{profile.nickname}</span>
                 <span className={`material-symbols-outlined ${styles['common-header__profile-arrow']}`}>expand_more</span>
               </button>
 
@@ -90,19 +130,22 @@ function Header() {
           {isLoggedIn ? (
             <>
               <div className={styles['common-header__mobile-profile']}>
-                <div className={styles['common-header__profile-circle']}></div>
-                <span className="text-s">{user.user_metadata?.nickname}</span>
+                <div className={styles['common-header__profile-circle']}>
+                  {profile.profileImageUrl && (
+                    <img
+                      src={profile.profileImageUrl}
+                      alt="프로필 사진"
+                      className={styles['common-header__profile-img']}
+                    />
+                  )}
+                </div>
+                <span className="text-s">{profile.nickname}</span>
               </div>
               <Link to="/" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>홈</Link>
               <Link to="/recipes" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>레시피</Link>
               <Link to="/mypage" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>마이페이지</Link>
               <Link to="/favorite" className={`${styles['common-header__mobile-link']} text-s`} onClick={closeMenu}>즐겨찾기</Link>
-              <button
-                className={`${styles['common-header__logout-btn']} text-s`}
-                onClick={handleLogout}
-              >
-                로그아웃
-              </button>
+              <button className={`${styles['common-header__logout-btn']} text-s`} onClick={handleLogout}>로그아웃</button>
             </>
           ) : (
             <>
