@@ -32,10 +32,10 @@ export async function getUserSafetyConditions(userId) {
   }
 
   const veganTypeId = profileResult.data?.vegan_type_id ?? null;
-  const veganTypeName = veganTypesResult.data?.find(v => v.id === veganTypeId)?.name ?? "";
+  const veganTypeName = veganTypesResult.data?.find((v) => v.id === veganTypeId)?.name ?? "";
 
   return {
-    allergenIds: (userAllergyResult.data ?? []).map(row => row.allergen_id),
+    allergenIds: (userAllergyResult.data ?? []).map((row) => row.allergen_id),
     allergyOptions: allergensResult.data ?? [],
     allergenCategoryMappings: mappingsResult.data ?? [],
     veganTypeId,
@@ -46,18 +46,18 @@ export async function getUserSafetyConditions(userId) {
 
 function findMatchedAllergy(ingredient, allergenIds, categoryMappings, allergyOptions) {
   const matched = categoryMappings.find(
-    mapping =>
-      allergenIds.some(id => String(id) === String(mapping.allergen_id)) &&
+    (mapping) =>
+      allergenIds.some((id) => String(id) === String(mapping.allergen_id)) &&
       String(mapping.category_id ?? mapping.food_category_id) === String(ingredient.categoryId),
   );
   if (!matched) return undefined;
-  return allergyOptions.find(a => String(a.id) === String(matched.allergen_id))?.name;
+  return allergyOptions.find((a) => String(a.id) === String(matched.allergen_id))?.name;
 }
 
 function isRestrictedForVeganType(ingredient, veganTypeId, veganTypeRestrictions) {
   if (veganTypeId == null || veganTypeId === "") return false;
   return veganTypeRestrictions.some(
-    r =>
+    (r) =>
       String(r.vegan_type_id) === String(veganTypeId) &&
       String(r.category_id ?? r.food_category_id) === String(ingredient.categoryId),
   );
@@ -77,7 +77,7 @@ export function getRecipeSafetyStatus(recipe, conditions) {
     veganTypeRestrictions,
   } = conditions;
 
-  const ingredients = (recipe.recipe_ingredients ?? []).map(item => ({
+  const ingredients = (recipe.recipe_ingredients ?? []).map((item) => ({
     name: item.ingredients.name,
     categoryId: item.ingredients.category_id,
   }));
@@ -96,7 +96,10 @@ export function getRecipeSafetyStatus(recipe, conditions) {
       matchedAllergyName = allergyName;
       break;
     }
-    if (!hasVeganConflict && isRestrictedForVeganType(ingredient, veganTypeId, veganTypeRestrictions)) {
+    if (
+      !hasVeganConflict &&
+      isRestrictedForVeganType(ingredient, veganTypeId, veganTypeRestrictions)
+    ) {
       hasVeganConflict = true;
     }
   }
@@ -106,7 +109,11 @@ export function getRecipeSafetyStatus(recipe, conditions) {
   }
 
   if (hasVeganConflict) {
-    return { safetyType: "needReplacement", safetyTitle: "AI 대체 가능", safetyDesc: "대체 재료 추천 있음" };
+    return {
+      safetyType: "needReplacement",
+      safetyTitle: "AI 대체 가능",
+      safetyDesc: "대체 재료 추천 있음",
+    };
   }
 
   return { safetyType: "safe", safetyTitle: "안전", safetyDesc: "제한 재료 없음" };

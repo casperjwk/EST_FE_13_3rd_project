@@ -57,6 +57,35 @@ function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Hero 검색/필터칩
+  const [searchValue, setSearchValue] = useState('');
+  const [heroConditions, setHeroConditions] = useState({ veganTypeName: '', allergyNames: [] });
+
+  useEffect(() => {
+    if (!user) {
+      setHeroConditions({ veganTypeName: '', allergyNames: [] });
+      return;
+    }
+    let isActive = true;
+
+    getUserSafetyConditions(user.id).then((conditions) => {
+      if (!isActive || !conditions) return;
+      const allergyNames = conditions.allergyOptions
+        .filter((a) => conditions.allergenIds.includes(a.id))
+        .map((a) => a.name);
+      setHeroConditions({ veganTypeName: conditions.veganTypeName, allergyNames });
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [user]);
+
+  const handleSearch = () => {
+    if (!searchValue.trim()) return;
+    navigate(`/recipes?q=${encodeURIComponent(searchValue.trim())}`);
+  };
+
   // 즐겨찾기
   const [displayedFavorites, setDisplayedFavorites] = useState([]);
 
@@ -226,33 +255,45 @@ function HomePage() {
                 type="text"
                 placeholder="재료나 메뉴를 검색해보세요"
                 className={styles['home-hero__search-input']}
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
-              <button className={`text-button-m ${styles['home-hero__search-btn']}`}>검색</button>
+              <button className={`text-button-m ${styles['home-hero__search-btn']}`} onClick={handleSearch}>
+                검색
+              </button>
             </div>
 
             <div className={styles['home-hero__chips-cta']}>
               <div className={styles['home-hero__chips']}>
-                <span className={styles['home-hero__chip']}>
-                  <span className="material-symbols-outlined">check</span>비건
-                </span>
-                <span className={styles['home-hero__chip']}>
-                  <span className="material-symbols-outlined">check</span>락토
-                </span>
-                <span className={styles['home-hero__chip']}>
-                  <span className="material-symbols-outlined">check</span>오보
-                </span>
-                <span className={`${styles['home-hero__chip']} ${styles['home-hero__chip--warning']}`}>
-                  <span className="material-symbols-outlined">warning</span>우유 제외
-                </span>
-                <span className={`${styles['home-hero__chip']} ${styles['home-hero__chip--warning']}`}>
-                  <span className="material-symbols-outlined">warning</span>난류 제외
-                </span>
-                <span className={`${styles['home-hero__chip']} ${styles['home-hero__chip--warning']}`}>
-                  <span className="material-symbols-outlined">warning</span>땅콩 제외
-                </span>
+                {heroConditions.veganTypeName && (
+                  <span className={styles['home-hero__chip']}>
+                    <span className="material-symbols-outlined">check</span>
+                    {heroConditions.veganTypeName}
+                  </span>
+                )}
+                {heroConditions.allergyNames.map((name) => (
+                  <span
+                    key={name}
+                    className={`${styles['home-hero__chip']} ${styles['home-hero__chip--warning']}`}
+                  >
+                    <span className="material-symbols-outlined">warning</span>
+                    {name} 제외
+                  </span>
+                ))}
+                {!user && (
+                  <Link to="/login" className={styles['home-hero__chip']}>
+                    로그인하고 내 조건 보기
+                  </Link>
+                )}
               </div>
 
-              <button className={`text-button-l ${styles['home-hero__cta-btn']}`}>맞춤 레시피 찾기</button>
+              <button
+                className={`text-button-l ${styles['home-hero__cta-btn']}`}
+                onClick={() => navigate('/recipes')}
+              >
+                맞춤 레시피 찾기
+              </button>
             </div>
           </div>
         </div>
