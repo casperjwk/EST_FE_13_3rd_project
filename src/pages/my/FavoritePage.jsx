@@ -10,7 +10,23 @@ import {
   getFavoriteRecipes,
   removeFavorite,
   getFavoriteCounts,
+  getCustomRecipeCacheEntries,
 } from "../../services/favoriteService";
+import { getUserSafetyConditions, getRecipeSafetyStatus } from "../../utils/recipeSafety";
+
+const safetyTypeToStatus = {
+  safe: "safe",
+  danger: "warning",
+  needReplacement: "replaceable",
+};
+
+function sortedUniqueIds(ids) {
+  return [...new Set((ids ?? []).map(String))].sort();
+}
+
+function sameIdSet(a, b) {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
 
 const difficultyStyles = {
   easy: "cardDifficultyEasy",
@@ -129,19 +145,45 @@ function FavoritePage() {
         setErrorMessage("");
 
         const recipes = await getFavoriteRecipes(authUser.id);
-        const favoriteCounts = await getFavoriteCounts(recipes.map(recipe => recipe.id));
+        const recipeIds = recipes.map(recipe => recipe.id);
+        const [favoriteCounts, safetyConditions, cacheEntries] = await Promise.all([
+          getFavoriteCounts(recipeIds),
+          getUserSafetyConditions(authUser.id),
+          getCustomRecipeCacheEntries(authUser.id, recipeIds),
+        ]);
+
+        const currentVeganTypeId = safetyConditions?.veganTypeId ?? null;
+        const currentAllergenIds = sortedUniqueIds(safetyConditions?.allergenIds);
+
         setFavoriteRecipes(
-          recipes.map(recipe => ({
-            id: recipe.id,
-            name: recipe.title,
-            description: recipe.description,
-            imageUrl: recipe.image_url,
-            difficulty: recipe.difficulty,
-            time: recipe.cooking_time,
-            servings: recipe.servings,
-            likes: favoriteCounts[recipe.id] ?? 0,
-            status: "safe",
-          })),
+          recipes.map(recipe => {
+            const { safetyType } = getRecipeSafetyStatus(recipe, safetyConditions);
+            let status = safetyTypeToStatus[safetyType] ?? "safe";
+
+            if (status === "replaceable") {
+              const hasSavedReplacement = cacheEntries.some(entry => {
+                if (entry.original_recipe_id !== recipe.id) return false;
+                if ((entry.vegan_type_id ?? null) !== currentVeganTypeId) return false;
+                const entryAllergenIds = sortedUniqueIds(
+                  (entry.ai_custom_recipe_allergies ?? []).map(a => a.allergen_id),
+                );
+                return sameIdSet(entryAllergenIds, currentAllergenIds);
+              });
+              if (hasSavedReplacement) status = "replaced";
+            }
+
+            return {
+              id: recipe.id,
+              name: recipe.title,
+              description: recipe.description,
+              imageUrl: recipe.image_url,
+              difficulty: recipe.difficulty,
+              time: recipe.cooking_time,
+              servings: recipe.servings,
+              likes: favoriteCounts[recipe.id] ?? 0,
+              status,
+            };
+          }),
         );
       } catch (error) {
         console.error("[HankkiLab] 즐겨찾기 레시피 조회 실패", error);
@@ -365,19 +407,25 @@ function FavoritePage() {
                         </span>
                       </span>
                     </span>
-                    <span className={styles.cardStatusRight}>
-                      {recipe.status === "safe" && (
+                    {recipe.status === "safe" ? (
+                      <span className={styles.cardStatusRight}>
                         <span className="material-icons" aria-hidden="true">
                           {statusConfig[recipe.status].rightIcon}
                         </span>
-                      )}
-                      {statusConfig[recipe.status].rightText}
-                      {recipe.status !== "safe" && (
+                        {statusConfig[recipe.status].rightText}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.cardStatusRight}
+                        onClick={() => goToRecipeDetail(recipe.id)}
+                      >
+                        {statusConfig[recipe.status].rightText}
                         <span className="material-icons" aria-hidden="true">
                           {statusConfig[recipe.status].rightIcon}
                         </span>
-                      )}
-                    </span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

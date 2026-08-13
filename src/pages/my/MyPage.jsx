@@ -14,8 +14,6 @@ import {
 } from "../../services/favoriteService";
 import styles from "./MyPage.module.css";
 
-// 즐겨찾기 개수는 아직 실제 집계 로직 없어서 목업 유지
-
 // DB(vegan_types 테이블)의 id와 맞춰야 저장이 정상 동작함
 const veganTypes = [
   { id: "general", label: "일반", desc: "제한 없음" },
@@ -71,6 +69,11 @@ function MyPage() {
   const [recentRecipes, setRecentRecipes] = useState([]);
   const [nickname, setNickname] = useState("");
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isEditingNickname, setIsEditingNickname] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState("");
+  const [isSavingNickname, setIsSavingNickname] = useState(false);
+  const [nicknameError, setNicknameError] = useState("");
+  const [nicknameJustSaved, setNicknameJustSaved] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawFailed, setWithdrawFailed] = useState(false);
@@ -381,6 +384,50 @@ function MyPage() {
     }
   };
 
+  const startEditingNickname = () => {
+    setNicknameDraft(nickname);
+    setNicknameError("");
+    setNicknameJustSaved(false);
+    setIsEditingNickname(true);
+  };
+
+  const cancelEditingNickname = () => {
+    if (isSavingNickname) return;
+    setNicknameError("");
+    setIsEditingNickname(false);
+  };
+
+  const saveNickname = async () => {
+    if (isSavingNickname || !authUser) return;
+
+    const trimmed = nicknameDraft.trim();
+    if (trimmed.length < 2) {
+      setNicknameError("2자 이상 입력해 주세요.");
+      return;
+    }
+
+    setNicknameError("");
+    setIsSavingNickname(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ nickname: trimmed })
+        .eq("id", authUser.id);
+      if (error) throw error;
+
+      setNickname(trimmed);
+      setNicknameJustSaved(true);
+      setTimeout(() => {
+        setIsEditingNickname(false);
+        setIsSavingNickname(false);
+      }, 1200);
+    } catch (error) {
+      console.error("[MyPage] 닉네임 저장 실패", error);
+      alert("닉네임을 저장하지 못했습니다. 다시 시도해주세요.");
+      setIsSavingNickname(false);
+    }
+  };
+
   const toggleAllergy = allergenId => {
     setSelectedAllergies(prev =>
       prev.includes(allergenId) ? prev.filter(item => item !== allergenId) : [...prev, allergenId],
@@ -508,7 +555,92 @@ function MyPage() {
 
             <div className={styles.profileCardText}>
               {!isProfileLoading && (
-                <p className={styles.profileCardName}>{nickname || "사용자"}</p>
+                <>
+                  <div className={styles.profileCardNameRow}>
+                    {isEditingNickname ? (
+                      <>
+                        <input
+                          type="text"
+                          className={styles.profileCardNameInput}
+                          value={nicknameDraft}
+                          onChange={event => {
+                            setNicknameDraft(event.target.value);
+                            setNicknameError("");
+                          }}
+                          onKeyDown={event => {
+                            if (event.key === "Enter") saveNickname();
+                            if (event.key === "Escape") cancelEditingNickname();
+                          }}
+                          maxLength={8}
+                          disabled={isSavingNickname}
+                          autoFocus
+                        />
+                        <div className={styles.profileCardNameActions}>
+                          <button
+                            type="button"
+                            className={styles.profileCardNameSaveBtn}
+                            onClick={saveNickname}
+                            disabled={isSavingNickname}
+                            aria-label="닉네임 저장"
+                          >
+                            <span className="material-icons" aria-hidden="true">
+                              save
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.profileCardNameCancelBtn}
+                            onClick={cancelEditingNickname}
+                            disabled={isSavingNickname}
+                            aria-label="닉네임 수정 취소"
+                          >
+                            <span className="material-icons" aria-hidden="true">
+                              close
+                            </span>
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className={styles.profileCardName}>{nickname || "사용자"}</p>
+                        <button
+                          type="button"
+                          className={styles.profileCardNameEditBtn}
+                          onClick={startEditingNickname}
+                          aria-label="닉네임 수정"
+                        >
+                          <span className="material-icons" aria-hidden="true">
+                            edit
+                          </span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {isEditingNickname && (
+                    <p
+                      className={`${styles.profileCardNameHelper}${
+                        nicknameJustSaved
+                          ? ` ${styles.profileCardNameHelperSuccess}`
+                          : nicknameError
+                            ? ` ${styles.profileCardNameHelperError}`
+                            : ""
+                      }`}
+                    >
+                      {nicknameJustSaved ? (
+                        <>
+                          <span className="material-icons" aria-hidden="true">
+                            check
+                          </span>
+                          저장됐어요!
+                        </>
+                      ) : nicknameError ? (
+                        nicknameError
+                      ) : (
+                        `${nicknameDraft.length}/8자`
+                      )}
+                    </p>
+                  )}
+                </>
               )}
               <p className={styles.profileCardEmail}>{authUser?.email ?? ""}</p>
             </div>

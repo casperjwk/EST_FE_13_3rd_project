@@ -173,6 +173,12 @@
   opacity: 1;
 }
 
+.profileCardNameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .profileCardName {
   font-size: var(--subtitle-l);
   color: var(--black-1);
@@ -187,12 +193,138 @@
   }
 }
 
+.profileCardNameEditBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--gray-1);
+  background: var(--white-1);
+  color: var(--gray-3);
+}
+.profileCardNameEditBtn:hover {
+  border-color: var(--black-1);
+  color: var(--black-1);
+}
+.profileCardNameEditBtn :global(.material-icons) {
+  font-size: 12px;
+}
+
+.profileCardNameInput {
+  box-sizing: border-box;
+  width: 120px;
+  min-width: 0;
+  flex-shrink: 0;
+  padding: 2px 0 4px;
+  border: none;
+  border-bottom: 1px solid var(--gray-3);
+  border-radius: 0;
+  background: transparent;
+  color: var(--black-1);
+  font-size: var(--subtitle-l);
+  line-height: 140%;
+  font-weight: 600;
+}
+.profileCardNameInput:focus {
+  outline: none;
+  border-bottom-color: var(--primary);
+}
+@media (min-width: 768px) {
+  .profileCardNameInput {
+    width: 140px;
+    font-size: var(--title-s);
+    line-height: 130%;
+    font-weight: 700;
+  }
+}
+
+.profileCardNameActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.profileCardNameSaveBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--secondary);
+  color: var(--white-1);
+}
+.profileCardNameSaveBtn:hover {
+  background: var(--primary);
+}
+.profileCardNameSaveBtn :global(.material-icons) {
+  font-size: 12px;
+}
+
+.profileCardNameCancelBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--gray-1);
+  background: var(--white-1);
+  color: var(--gray-3);
+}
+.profileCardNameCancelBtn:hover {
+  border-color: var(--black-1);
+  color: var(--black-1);
+}
+.profileCardNameCancelBtn :global(.material-icons) {
+  font-size: 12px;
+}
+
 .profileCardEmail {
-  margin: 0;
+  margin: 5px 0 0;
   color: var(--gray-3);
   font-size: var(--small);
   line-height: 150%;
   font-weight: 400;
+}
+
+.profileCardNameHelper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  gap: 5px;
+  margin: 3px 0 0;
+  color: var(--gray-2);
+  font-size: var(--xsmall);
+  line-height: 150%;
+  font-weight: 400;
+}
+@media (min-width: 768px) {
+  .profileCardNameHelper {
+    width: 140px;
+  }
+}
+
+.profileCardNameHelperError {
+  color: var(--danger);
+}
+
+.profileCardNameHelperSuccess {
+  gap: 3px;
+  color: var(--primary);
+}
+
+.profileCardNameHelperSuccess :global(.material-icons) {
+  font-size: 12px;
 }
 
 .profileCardDivider {
