@@ -243,6 +243,10 @@ function MyPage() {
   }, [authUser, authLoading]);
 
   const goToRecipeDetail = id => {
+    if (recentDrag.current.moved) {
+      recentDrag.current.moved = false;
+      return;
+    }
     navigate(`/recipes/${id}`);
   };
 
@@ -495,6 +499,7 @@ function MyPage() {
   };
 
   const recentScrollRef = useRef(null);
+  const recentDrag = useRef({ isDown: false, startX: 0, scrollLeft: 0, moved: false });
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
 
@@ -513,6 +518,32 @@ function MyPage() {
     const el = recentScrollRef.current;
     if (!el) return;
     el.scrollBy({ left: direction * 215, behavior: "smooth" });
+  };
+
+  const handleRecentDragStart = event => {
+    const el = recentScrollRef.current;
+    if (!el) return;
+    recentDrag.current = { isDown: true, startX: event.pageX, scrollLeft: el.scrollLeft, moved: false };
+    el.style.cursor = "grabbing";
+    el.style.userSelect = "none";
+  };
+
+  const handleRecentDragMove = event => {
+    const drag = recentDrag.current;
+    const el = recentScrollRef.current;
+    if (!drag.isDown || !el) return;
+    const delta = event.pageX - drag.startX;
+    if (Math.abs(delta) > 3) drag.moved = true;
+    el.scrollLeft = drag.scrollLeft - delta;
+  };
+
+  const handleRecentDragEnd = () => {
+    const el = recentScrollRef.current;
+    recentDrag.current.isDown = false;
+    if (el) {
+      el.style.cursor = "";
+      el.style.userSelect = "";
+    }
   };
 
   return (
@@ -878,6 +909,10 @@ function MyPage() {
             className={styles.recentScroll}
             ref={recentScrollRef}
             onScroll={updateRecentScrollState}
+            onMouseDown={handleRecentDragStart}
+            onMouseMove={handleRecentDragMove}
+            onMouseUp={handleRecentDragEnd}
+            onMouseLeave={handleRecentDragEnd}
           >
             {recentRecipes.map(recipe => {
               const isFavorite = favoriteRecipeIds.has(recipe.id);
@@ -887,7 +922,12 @@ function MyPage() {
                     className={styles.recentImageWrap}
                     onClick={() => goToRecipeDetail(recipe.id)}
                   >
-                    <img src={recipe.imageUrl} alt={recipe.name} className={styles.recentImage} />
+                    <img
+                      src={recipe.imageUrl}
+                      alt={recipe.name}
+                      className={styles.recentImage}
+                      draggable={false}
+                    />
                     <span
                       className={`${styles.recentDifficulty} ${
                         styles[difficultyStyles[recipe.difficulty]]

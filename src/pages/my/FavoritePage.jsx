@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import "material-icons/iconfont/filled.css";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "../../styles/global.css";
@@ -26,6 +26,21 @@ function sortedUniqueIds(ids) {
 
 function sameIdSet(a, b) {
   return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
+function getCardsPerPage() {
+  if (typeof window === "undefined") return 3;
+  if (window.matchMedia("(min-width: 1272px)").matches) return 9;
+  if (window.matchMedia("(min-width: 768px)").matches) return 6;
+  return 3;
+}
+
+function getPageNumbers(current, total) {
+  const groupSize = 5;
+  const groupIndex = Math.floor((current - 1) / groupSize);
+  const start = groupIndex * groupSize + 1;
+  const end = Math.min(start + groupSize - 1, total);
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 }
 
 const difficultyStyles = {
@@ -80,6 +95,47 @@ function FavoritePage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [summaryNickname, setSummaryNickname] = useState("");
   const [appliedConditions, setAppliedConditions] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [cardsPerPage, setCardsPerPage] = useState(() => getCardsPerPage());
+  const cardsPerPageRef = useRef(cardsPerPage);
+
+  const rawPageParam = Number.parseInt(searchParams.get("page"), 10);
+  const requestedPage = Number.isInteger(rawPageParam) && rawPageParam > 0 ? rawPageParam : 1;
+
+  const goToPage = number => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (number <= 1) {
+        next.delete("page");
+      } else {
+        next.set("page", String(number));
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    cardsPerPageRef.current = cardsPerPage;
+  }, [cardsPerPage]);
+
+  useEffect(() => {
+    const updateCardsPerPage = () => {
+      const next = getCardsPerPage();
+      if (next !== cardsPerPageRef.current) {
+        setCardsPerPage(next);
+        setSearchParams(
+          prev => {
+            const nextParams = new URLSearchParams(prev);
+            nextParams.delete("page");
+            return nextParams;
+          },
+          { replace: true },
+        );
+      }
+    };
+    window.addEventListener("resize", updateCardsPerPage);
+    return () => window.removeEventListener("resize", updateCardsPerPage);
+  }, [setSearchParams]);
 
   useEffect(() => {
     if (authLoading || authUser) {
@@ -232,6 +288,31 @@ function FavoritePage() {
   const warningCount = favoriteRecipes.filter(recipe => recipe.status === "warning").length;
   const aiReplacedCount = favoriteRecipes.filter(recipe => recipe.status === "replaced").length;
 
+  const totalPages = Math.max(1, Math.ceil(favoriteRecipes.length / cardsPerPage));
+  const safeCurrentPage = Math.min(requestedPage, totalPages);
+  const pagedRecipes = favoriteRecipes.slice(
+    (safeCurrentPage - 1) * cardsPerPage,
+    safeCurrentPage * cardsPerPage,
+  );
+  const pageNumbers = getPageNumbers(safeCurrentPage, totalPages);
+
+  // 주소창에 존재하지 않는 페이지 번호(범위 초과/음수/문자 등)가 들어오면 실제로 보여준 페이지로 주소를 바로잡음
+  useEffect(() => {
+    if (!hasFavorites || requestedPage === safeCurrentPage) return;
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev);
+        if (safeCurrentPage <= 1) {
+          next.delete("page");
+        } else {
+          next.set("page", String(safeCurrentPage));
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }, [hasFavorites, requestedPage, safeCurrentPage, setSearchParams]);
+
   return (
     <div className={styles.favoritePage}>
       <div className={`container ${styles.favoritePageInner}`}>
@@ -340,7 +421,7 @@ function FavoritePage() {
         </section>
 
         <div className={styles.cardGrid}>
-          {favoriteRecipes.map(recipe => {
+          {pagedRecipes.map(recipe => {
             return (
               <div key={recipe.id} className={styles.cardItem}>
                 <div
@@ -432,6 +513,48 @@ function FavoritePage() {
             );
           })}
         </div>
+
+        {totalPages > 1 && (
+          <nav className={styles.pagination} aria-label="즐겨찾기 페이지 이동">
+            <button
+              type="button"
+              className={styles.paginationArrow}
+              onClick={() => goToPage(Math.max(1, safeCurrentPage - 1))}
+              disabled={safeCurrentPage === 1}
+              aria-label="이전 페이지"
+            >
+              <span className="material-icons" aria-hidden="true">
+                chevron_left
+              </span>
+            </button>
+            <div className={styles.paginationNumbers}>
+              {pageNumbers.map(number => (
+                <button
+                  key={number}
+                  type="button"
+                  className={`${styles.paginationNumber} ${
+                    number === safeCurrentPage ? styles.paginationNumberActive : ""
+                  }`}
+                  onClick={() => goToPage(number)}
+                  aria-current={number === safeCurrentPage ? "page" : undefined}
+                >
+                  {number}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={styles.paginationArrow}
+              onClick={() => goToPage(Math.min(totalPages, safeCurrentPage + 1))}
+              disabled={safeCurrentPage === totalPages}
+              aria-label="다음 페이지"
+            >
+              <span className="material-icons" aria-hidden="true">
+                chevron_right
+              </span>
+            </button>
+          </nav>
+        )}
           </>
         )}
       </div>
