@@ -10,6 +10,7 @@ import { useAuth } from "../../context/AuthContext";
 import { getFavoriteRecipeIds, addFavorite, removeFavorite } from "../../services/favoriteService";
 import { getUserSafetyConditions, getRecipeSafetyStatus } from "../../utils/recipeSafety";
 import { getAiReplacedRecipeIds } from "../../services/aiRecipeService";
+import { useSearchParams } from "react-router";
 
 const RECIPE_LOAD_COUNT = 6;
 
@@ -25,6 +26,23 @@ const SORT_OPTIONS = [
   { value: "difficulty", label: "난이도순" },
 ];
 
+function recipeMatchesKeyword(recipe, keyword) {
+  if (!keyword) return true;
+
+  const normalizedKeyword = keyword.toLowerCase();
+
+  const searchableText = [
+    recipe.title,
+    recipe.description,
+    ...(recipe.recipe_ingredients ?? []).map((item) => item.ingredients?.name),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return searchableText.includes(normalizedKeyword);
+}
+
 function RecipeListPage() {
   const { user: authUser, loading: authLoading } = useAuth();
 
@@ -38,6 +56,22 @@ function RecipeListPage() {
   const [allergyFilters, setAllergyFilters] = useState({});
   const [favoriteRecipeIds, setFavoriteRecipeIds] = useState(() => new Set());
   const [safetyConditions, setSafetyConditions] = useState(null);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const keyword = searchParams.get("q")?.trim() ?? "";
+  const [searchValue, setSearchValue] = useState(keyword);
+
+  const handleSearch = () => {
+    const nextKeyword = searchValue.trim();
+
+    if (!nextKeyword) {
+      searchParams.delete("q");
+      setSearchParams(searchParams);
+      return;
+    }
+
+    setSearchParams({ q: nextKeyword });
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -169,7 +203,10 @@ function RecipeListPage() {
         ],
       }
     : null;
+
   const filteredRecipes = recipes.filter((recipe) => {
+    if (!recipeMatchesKeyword(recipe, keyword)) return false;
+
     if (recipe.hasAiCustomRecipe) return true;
 
     const passesAllergyFilter = filterRecipesByAllergies([recipe], allergyFilters).length > 0;
@@ -250,6 +287,21 @@ function RecipeListPage() {
     <div className={style.main}>
       <div className="container">
         <h2 className={`${style.title} text-title-m`}>레시피 둘러보기</h2>
+
+        <div className={style.searchArea}>
+          <input
+            type="text"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            placeholder="재료나 메뉴를 검색해보세요"
+            className={style.searchInput}
+          />
+          <button type="button" onClick={handleSearch} className={style.searchButton}>
+            검색
+          </button>
+        </div>
+
         <FilterPanel
           allergyFilters={allergyFilters}
           onAllergyChange={setAllergyFilters}
