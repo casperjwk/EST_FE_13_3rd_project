@@ -202,6 +202,11 @@ function HomePage() {
     <div className={styles['home-page']}>
       <section className={styles['home-hero']}>
         <div className={`container ${styles['home-hero__inner']}`}>
+          <div className={styles['home-hero__badge']}>
+            <span className={styles['home-hero__badge-dot']}></span>
+            AI 기반 맞춤 레시피 서비스
+          </div>
+
           <div className={styles['home-hero__track-wrapper']}>
             <div
               className={styles['home-hero__track']}
@@ -241,6 +246,21 @@ function HomePage() {
                 aria-label={`${index + 1}번째 슬라이드`}
               ></button>
             ))}
+          </div>
+
+          <div className={styles['home-hero__stats']}>
+            <span className={styles['home-hero__stat']}>
+              <span className="material-symbols-outlined">check</span>
+              AI 성분 분석
+            </span>
+            <span className={styles['home-hero__stat']}>
+              <span className="material-symbols-outlined">check</span>
+              알레르기 조건 반영
+            </span>
+            <span className={styles['home-hero__stat']}>
+              <span className="material-symbols-outlined">check</span>
+              비건 유형 8가지
+            </span>
           </div>
 
           <div className={styles['home-hero__fixed-area']}>
@@ -295,26 +315,36 @@ function HomePage() {
 
       <section className={styles['home-process']}>
         <div className={`container ${styles['home-process__inner']}`}>
-          {STEPS.map((step, index) => (
-            <Fragment key={index}>
-              <div className={styles['home-process__step']}>
-                <div className={styles['home-process__icon-circle']}>
-                  <span className={`material-symbols-outlined ${styles['home-process__icon']}`}>
-                    {step.icon}
-                  </span>
-                </div>
-                <div className={styles['home-process__text']}>
+          <div className={styles['home-process__header']}>
+            <p className={styles['home-process__eyebrow']}>HOW IT WORKS</p>
+            <h2 className={styles['home-process__heading']}>이렇게 찾아드려요</h2>
+            <p className={styles['home-process__subheading']}>3단계로 안전한 레시피를 추천해요</p>
+          </div>
+          <div className={styles['home-process__steps']}>
+            {STEPS.map((step, index) => (
+              <Fragment key={index}>
+                <div className={styles['home-process__step']}>
+                  <div
+                    className={`${styles['home-process__icon-circle']} ${styles[`home-process__icon-circle--${index}`]}`}
+                  >
+                    <span
+                      className={`material-symbols-outlined ${styles['home-process__icon']} ${styles[`home-process__icon--${index}`]}`}
+                    >
+                      {step.icon}
+                    </span>
+                  </div>
+                  <p className={styles['home-process__step-label']}>STEP 0{index + 1}</p>
                   <p className={styles['home-process__title']}>{step.title}</p>
                   <p className={styles['home-process__desc']}>{step.desc}</p>
                 </div>
-              </div>
-              {index < STEPS.length - 1 && (
-                <span className={`material-symbols-outlined ${styles['home-process__arrow']}`}>
-                  arrow_forward
-                </span>
-              )}
-            </Fragment>
-          ))}
+                {index < STEPS.length - 1 && (
+                  <span className={`material-symbols-outlined ${styles['home-process__arrow']}`}>
+                    arrow_forward
+                  </span>
+                )}
+              </Fragment>
+            ))}
+          </div>
         </div>
       </section>
 
