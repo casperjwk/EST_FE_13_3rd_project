@@ -1134,7 +1134,6 @@
 .more-info-modal {
   display: flex;
   width: min(402px, 100%);
-  min-height: 478px;
   flex-direction: column;
   gap: 20px;
   padding: 25px;
@@ -2246,7 +2245,6 @@
 
   .more-info-modal {
     width: 800px;
-    min-height: 520px;
     gap: 30px;
     padding: 40px;
     border-radius: 50px;

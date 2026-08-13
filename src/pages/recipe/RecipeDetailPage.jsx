@@ -4,10 +4,7 @@ import Badge from "../../components/common/Badge";
 import { supabase } from "../../lib/supabase";
 import styles from "./RecipeDetailPage.module.css";
 import { recordRecipeView } from "../../services/recentViewService";
-import {
-  generateCustomRecipe,
-  getCachedCustomRecipe,
-} from "../../services/aiRecipeService";
+import { generateCustomRecipe, getCachedCustomRecipe } from "../../services/aiRecipeService";
 
 const VEGAN_TYPE_ORDER = [
   "general",
@@ -19,6 +16,8 @@ const VEGAN_TYPE_ORDER = [
   "ovo",
   "vegan",
 ];
+
+const INGREDIENT_CHECK_CATEGORY_IDS = new Set(["condiments", "kimchi", "meat", "seasoning"]);
 
 function sortVeganTypes(veganTypes) {
   const orderById = new Map(VEGAN_TYPE_ORDER.map((id, index) => [id, index]));
@@ -61,9 +60,8 @@ function findMatchedAllergy(ingredient, allergenIds, categoryMappings, allergyOp
   );
 
   if (!matchedMapping) return undefined;
-  return allergyOptions.find(
-    allergy => String(allergy.id) === String(matchedMapping.allergen_id),
-  )?.name;
+  return allergyOptions.find(allergy => String(allergy.id) === String(matchedMapping.allergen_id))
+    ?.name;
 }
 
 function isRestrictedForVeganType(ingredient, veganTypeId, veganTypeRestrictions) {
@@ -142,10 +140,7 @@ function IngredientPanel({ ingredients }) {
       </h2>
       <ul>
         {ingredients.map(ingredient => (
-          <li
-            key={ingredient.id ?? ingredient.name}
-            className={cn("ingredient")}
-          >
+          <li key={ingredient.id ?? ingredient.name} className={cn("ingredient")}>
             <div
               className={cn(
                 "ingredient__row",
@@ -517,6 +512,12 @@ function RecipeDetailPage() {
     };
   });
   const displayedIngredients = isComplete && aiCustomRecipe ? aiIngredients : ingredients;
+  const ingredientsRequiringLabelCheck =
+    isComplete && aiCustomRecipe
+      ? displayedIngredients.filter(ingredient =>
+          INGREDIENT_CHECK_CATEGORY_IDS.has(ingredient.categoryId),
+        )
+      : [];
   const aiDetailSteps = (aiCustomRecipe?.steps?.detail ?? []).map(step => step.description);
   const aiBriefSteps = (aiCustomRecipe?.steps?.brief ?? []).map(step => step.description);
   const displayedSteps = isComplete && aiCustomRecipe ? aiDetailSteps : steps;
@@ -528,15 +529,16 @@ function RecipeDetailPage() {
       : briefSteps.length > 0
         ? briefSteps
         : steps;
-  const displayedRecipe = isComplete && aiCustomRecipe
-    ? {
-        ...recipe,
-        title: aiCustomRecipe.title,
-        description: aiCustomRecipe.description,
-        servings: aiCustomRecipe.servings,
-        cooking_time: aiCustomRecipe.cookingTime,
-      }
-    : recipe;
+  const displayedRecipe =
+    isComplete && aiCustomRecipe
+      ? {
+          ...recipe,
+          title: aiCustomRecipe.title,
+          description: aiCustomRecipe.description,
+          servings: aiCustomRecipe.servings,
+          cooking_time: aiCustomRecipe.cookingTime,
+        }
+      : recipe;
 
   useEffect(() => {
     let isActive = true;
@@ -571,9 +573,9 @@ function RecipeDetailPage() {
       setRecipeError("");
       try {
         const { data, error } = await supabase
-        .from("recipes")
-        .select(
-          `
+          .from("recipes")
+          .select(
+            `
           id,
           title,
           description,
@@ -596,25 +598,25 @@ function RecipeDetailPage() {
             step_type
           )
         `,
-        )
-        .eq("id", id)
-        .maybeSingle();
+          )
+          .eq("id", id)
+          .maybeSingle();
 
         if (!isActive) return;
         if (error) {
-        console.error("[HankkiLab] Recipe detail error:", error);
-        setRecipeError("레시피를 불러오지 못했습니다.");
+          console.error("[HankkiLab] Recipe detail error:", error);
+          setRecipeError("레시피를 불러오지 못했습니다.");
         } else if (!data) {
-        setRecipeError("존재하지 않는 레시피입니다.");
+          setRecipeError("존재하지 않는 레시피입니다.");
         } else {
-        setRecipe(data);
-        setAnalysisState("before");
-        setAnalysisProgress(0);
-        setAnalysisError("");
-        setAiCustomRecipe(null);
-        setSimpleRecipeStep(0);
-        setRecipeQuestion("");
-        setQuestionMessages([]);
+          setRecipe(data);
+          setAnalysisState("before");
+          setAnalysisProgress(0);
+          setAnalysisError("");
+          setAiCustomRecipe(null);
+          setSimpleRecipeStep(0);
+          setRecipeQuestion("");
+          setQuestionMessages([]);
           void recordLoadedRecipeView(data.id);
         }
       } catch (error) {
@@ -639,31 +641,31 @@ function RecipeDetailPage() {
       setIsConditionDataLoading(true);
       try {
         const [allergensResult, veganTypesResult, mappingsResult, restrictionsResult] =
-        await Promise.all([
-        supabase.from("allergens").select("id, name").order("name"),
-        supabase.from("vegan_types").select("id, name, description"),
-        supabase.from("allergen_category_mappings").select("*"),
-        supabase.from("vegan_type_restrictions").select("*"),
-      ]);
+          await Promise.all([
+            supabase.from("allergens").select("id, name").order("name"),
+            supabase.from("vegan_types").select("id, name, description"),
+            supabase.from("allergen_category_mappings").select("*"),
+            supabase.from("vegan_type_restrictions").select("*"),
+          ]);
 
-      if (!isActive) return;
-      const error =
-        allergensResult.error ??
-        veganTypesResult.error ??
-        mappingsResult.error ??
-        restrictionsResult.error;
-      if (error) {
-        console.error("[HankkiLab] Condition options error:", error);
-        setConditionOptionsError("조건 목록을 불러오지 못했습니다.");
-        setIsConditionDataLoading(false);
-        return;
-      }
+        if (!isActive) return;
+        const error =
+          allergensResult.error ??
+          veganTypesResult.error ??
+          mappingsResult.error ??
+          restrictionsResult.error;
+        if (error) {
+          console.error("[HankkiLab] Condition options error:", error);
+          setConditionOptionsError("조건 목록을 불러오지 못했습니다.");
+          setIsConditionDataLoading(false);
+          return;
+        }
 
-      setAllergyOptions(allergensResult.data ?? []);
-      setVeganOptions(sortVeganTypes(veganTypesResult.data ?? []));
-      setAllergenCategoryMappings(mappingsResult.data ?? []);
-      setVeganTypeRestrictions(restrictionsResult.data ?? []);
-      setConditionOptionsError("");
+        setAllergyOptions(allergensResult.data ?? []);
+        setVeganOptions(sortVeganTypes(veganTypesResult.data ?? []));
+        setAllergenCategoryMappings(mappingsResult.data ?? []);
+        setVeganTypeRestrictions(restrictionsResult.data ?? []);
+        setConditionOptionsError("");
         setIsConditionDataLoading(false);
       } catch (error) {
         if (!isActive) return;
@@ -686,80 +688,76 @@ function RecipeDetailPage() {
       setIsUserConditionsLoading(true);
       try {
         const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (!isActive) return;
-      if (sessionError) {
-        console.error("[HankkiLab] User condition session error:", sessionError);
-        setIsUserConditionsLoading(false);
-        return;
-      }
-
-      if (!session?.user) {
-        setAppliedAllergies([]);
-        setAppliedAllergenIds([]);
-        setAppliedVeganType("");
-        setAppliedVeganTypeId(null);
-        setDraftAllergies([]);
-        setDraftVeganType("");
-        setIsUserConditionsLoading(false);
-        return;
-      }
-
-      const [profileResult, allergyResult] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("vegan_type_id")
-          .eq("id", session.user.id)
-          .maybeSingle(),
-        supabase
-          .from("user_allergies")
-          .select("allergen_id, allergens(name)")
-          .eq("user_id", session.user.id),
-      ]);
-
-      if (!isActive) return;
-      if (profileResult.error || allergyResult.error) {
-        console.error("[HankkiLab] User conditions error:", {
-          profileError: profileResult.error,
-          allergyError: allergyResult.error,
-        });
-        setIsUserConditionsLoading(false);
-        return;
-      }
-
-      const allergies = (allergyResult.data ?? [])
-        .map(item => {
-          const allergen = Array.isArray(item.allergens) ? item.allergens[0] : item.allergens;
-          return allergen?.name;
-        })
-        .filter(name => typeof name === "string");
-      const allergenIds = (allergyResult.data ?? []).map(item => item.allergen_id);
-
-      let veganType = "";
-      if (profileResult.data?.vegan_type_id != null) {
-        const { data: veganTypeData, error: veganTypeError } = await supabase
-          .from("vegan_types")
-          .select("name")
-          .eq("id", profileResult.data.vegan_type_id)
-          .maybeSingle();
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
         if (!isActive) return;
-        if (veganTypeError) {
-          console.error("[HankkiLab] User vegan type error:", veganTypeError);
-        } else {
-          veganType = veganTypeData?.name ?? "";
+        if (sessionError) {
+          console.error("[HankkiLab] User condition session error:", sessionError);
+          setIsUserConditionsLoading(false);
+          return;
         }
-      }
 
-      setAppliedAllergies(allergies);
-      setAppliedAllergenIds(allergenIds);
-      setAppliedVeganType(veganType);
-      setAppliedVeganTypeId(profileResult.data?.vegan_type_id ?? null);
-      setDraftAllergies(allergies);
-      setDraftVeganType(veganType);
+        if (!session?.user) {
+          setAppliedAllergies([]);
+          setAppliedAllergenIds([]);
+          setAppliedVeganType("");
+          setAppliedVeganTypeId(null);
+          setDraftAllergies([]);
+          setDraftVeganType("");
+          setIsUserConditionsLoading(false);
+          return;
+        }
+
+        const [profileResult, allergyResult] = await Promise.all([
+          supabase.from("profiles").select("vegan_type_id").eq("id", session.user.id).maybeSingle(),
+          supabase
+            .from("user_allergies")
+            .select("allergen_id, allergens(name)")
+            .eq("user_id", session.user.id),
+        ]);
+
+        if (!isActive) return;
+        if (profileResult.error || allergyResult.error) {
+          console.error("[HankkiLab] User conditions error:", {
+            profileError: profileResult.error,
+            allergyError: allergyResult.error,
+          });
+          setIsUserConditionsLoading(false);
+          return;
+        }
+
+        const allergies = (allergyResult.data ?? [])
+          .map(item => {
+            const allergen = Array.isArray(item.allergens) ? item.allergens[0] : item.allergens;
+            return allergen?.name;
+          })
+          .filter(name => typeof name === "string");
+        const allergenIds = (allergyResult.data ?? []).map(item => item.allergen_id);
+
+        let veganType = "";
+        if (profileResult.data?.vegan_type_id != null) {
+          const { data: veganTypeData, error: veganTypeError } = await supabase
+            .from("vegan_types")
+            .select("name")
+            .eq("id", profileResult.data.vegan_type_id)
+            .maybeSingle();
+
+          if (!isActive) return;
+          if (veganTypeError) {
+            console.error("[HankkiLab] User vegan type error:", veganTypeError);
+          } else {
+            veganType = veganTypeData?.name ?? "";
+          }
+        }
+
+        setAppliedAllergies(allergies);
+        setAppliedAllergenIds(allergenIds);
+        setAppliedVeganType(veganType);
+        setAppliedVeganTypeId(profileResult.data?.vegan_type_id ?? null);
+        setDraftAllergies(allergies);
+        setDraftVeganType(veganType);
         setIsUserConditionsLoading(false);
       } catch (error) {
         if (!isActive) return;
@@ -979,18 +977,18 @@ function RecipeDetailPage() {
 
     try {
       const {
-      data: { session },
-    } = await supabase.auth.getSession();
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (!session) {
-      setQuestionMessages(current => [
-        ...current,
-        {
-          role: "assistant",
-          content: "로그인 후 AI 질문 기능을 이용해 주세요.",
-          status: "error",
-        },
-      ]);
+        setQuestionMessages(current => [
+          ...current,
+          {
+            role: "assistant",
+            content: "로그인 후 AI 질문 기능을 이용해 주세요.",
+            status: "error",
+          },
+        ]);
         return;
       }
 
@@ -1003,24 +1001,24 @@ function RecipeDetailPage() {
       });
 
       if (error) {
-      console.error("[HankkiLab] Recipe question error:", error);
-      setQuestionMessages(current => [
-        ...current,
-        {
-          role: "assistant",
-          content: "답변을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.",
-          status: "error",
-        },
-      ]);
+        console.error("[HankkiLab] Recipe question error:", error);
+        setQuestionMessages(current => [
+          ...current,
+          {
+            role: "assistant",
+            content: "답변을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.",
+            status: "error",
+          },
+        ]);
       } else if (!data?.answer) {
-      setQuestionMessages(current => [
-        ...current,
-        {
-          role: "assistant",
-          content: "AI가 답변을 생성하지 못했어요. 질문을 바꿔 다시 시도해 주세요.",
-          status: "error",
-        },
-      ]);
+        setQuestionMessages(current => [
+          ...current,
+          {
+            role: "assistant",
+            content: "AI가 답변을 생성하지 못했어요. 질문을 바꿔 다시 시도해 주세요.",
+            status: "error",
+          },
+        ]);
       } else {
         setQuestionMessages(current => [...current, { role: "assistant", content: data.answer }]);
       }
@@ -1117,10 +1115,7 @@ function RecipeDetailPage() {
                 {displayedSteps.map((step, index) => (
                   <li
                     key={step}
-                    className={cn(
-                      isComplete ? "step--replaced" : "",
-                      "column-gap-3 py-3",
-                    )}
+                    className={cn(isComplete ? "step--replaced" : "", "column-gap-3 py-3")}
                   >
                     <span>{index + 1}</span>
                     <div>
@@ -1333,43 +1328,41 @@ function RecipeDetailPage() {
               )}
             </section>
 
-            <section className={cn("more-info-section more-info-section--check")}>
-              <h3 className="text-button-m">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  do_not_disturb_on
-                </span>
-                성분표를 직접 확인해 주세요
-              </h3>
-              <div className={cn("more-info-card")}>
-                <div className={cn("more-info-check-list text-xs")}>
-                  <div>
-                    <strong>김치</strong>
-                    <span>1컵 (150g)</span>
-                    <em>확인필요</em>
+            {ingredientsRequiringLabelCheck.length > 0 && (
+              <section className={cn("more-info-section more-info-section--check")}>
+                <h3 className="text-button-m">
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    do_not_disturb_on
+                  </span>
+                  성분표를 직접 확인해 주세요
+                </h3>
+                <div className={cn("more-info-card")}>
+                  <div className={cn("more-info-check-list text-xs")}>
+                    {ingredientsRequiringLabelCheck.map(ingredient => (
+                      <div key={`${ingredient.id}-${ingredient.name}`}>
+                        <strong>{ingredient.name}</strong>
+                        <span>{ingredient.amount}</span>
+                        <em>확인필요</em>
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <strong>김치국물</strong>
-                    <span>5스푼 (50g)</span>
-                    <em>확인필요</em>
-                  </div>
+                  <ul className={cn("more-info-notes text-xs")}>
+                    <li>
+                      <span className="material-symbols-outlined" aria-hidden="true">
+                        arrow_right_alt
+                      </span>
+                      자세한 성분은 직접 확인해 주세요.
+                    </li>
+                    <li>
+                      <span className="material-symbols-outlined" aria-hidden="true">
+                        arrow_right_alt
+                      </span>
+                      재료에 따라 알레르기, 비건 조건에 부적합할 수 있습니다.
+                    </li>
+                  </ul>
                 </div>
-                <ul className={cn("more-info-notes text-xs")}>
-                  <li>
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      forward
-                    </span>
-                    돼지고기 추출물, 돈골 육수, 육수 조미료 확인 필요
-                  </li>
-                  <li>
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      forward
-                    </span>
-                    페스코 조건에는 적합할 수 있으나, 돼지고기 및 육류 유래 성분 포함 여부를 확인해
-                    주세요.
-                  </li>
-                </ul>
-              </div>
-            </section>
+              </section>
+            )}
           </section>
         </div>
       )}
