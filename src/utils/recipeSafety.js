@@ -40,6 +40,7 @@ export async function getUserSafetyConditions(userId) {
     allergenCategoryMappings: mappingsResult.data ?? [],
     veganTypeId,
     veganTypeName,
+    veganOptions: veganTypesResult.data ?? [],
     veganTypeRestrictions: restrictionsResult.data ?? [],
   };
 }
