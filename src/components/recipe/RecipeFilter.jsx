@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import styles from "./recipeFilter.module.css";
 
-const allergyItems = [
+const ALLERGY_DISPLAY_ORDER = [
   "우유",
   "생선",
   "달걀",
@@ -17,17 +17,58 @@ const allergyItems = [
   "소고기",
   "게",
   "조개류",
+  "버섯",
 ];
 
-const veganItems = ["일반", "플렉시테리언", "폴로", "페스코", "락토-오보", "락토", "오보", "비건"];
+const VEGAN_DISPLAY_ORDER = [
+  "일반",
+  "플렉시테리언",
+  "폴로",
+  "페스코",
+  "락토-오보",
+  "락토",
+  "오보",
+  "비건",
+];
 
-function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChange }) {
-  const currentVeganFilter = veganFilter ?? "일반";
+function sortByDisplayOrder(options, displayOrder) {
+  return [...options].sort((a, b) => {
+    const aIndex = displayOrder.indexOf(a.name);
+    const bIndex = displayOrder.indexOf(b.name);
+
+    if (aIndex === -1 && bIndex === -1) {
+      return a.name.localeCompare(b.name, "ko");
+    }
+    if (aIndex === -1) return 1;
+    if (bIndex === -1) return -1;
+
+    return aIndex - bIndex;
+  });
+}
+
+function sortVeganOptions(veganOptions) {
+  return sortByDisplayOrder(veganOptions, VEGAN_DISPLAY_ORDER);
+}
+
+function FilterPanel({
+  allergyFilters,
+  onAllergyChange,
+  allergyOptions = [],
+  veganFilter,
+  onVeganChange,
+  veganOptions = [],
+}) {
+  const defaultVeganType = veganOptions.find(option => option.name === "일반");
+  const defaultVeganTypeId = defaultVeganType?.id ?? null;
+  const currentVeganFilter = veganFilter ?? defaultVeganTypeId ?? "";
   const currentAllergyFilters = allergyFilters ?? {};
+  const sortedAllergyOptions = sortByDisplayOrder(allergyOptions, ALLERGY_DISPLAY_ORDER);
+  const sortedVeganOptions = sortVeganOptions(veganOptions);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  const handleAllergyClick = (item) => {
-    const current = currentAllergyFilters[item] || "none";
+  const handleAllergyClick = allergenId => {
+    const filterKey = String(allergenId);
+    const current = currentAllergyFilters[filterKey] || "none";
 
     let next = "none";
     if (current === "none") next = "warning";
@@ -35,22 +76,22 @@ function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChan
 
     onAllergyChange?.({
       ...currentAllergyFilters,
-      [item]: next,
+      [filterKey]: next,
     });
   };
 
-  const handleVeganClick = (item) => {
-    onVeganChange?.(item);
+  const handleVeganClick = veganTypeId => {
+    onVeganChange?.(veganTypeId);
   };
 
   const resetAllFilters = () => {
     onAllergyChange?.({});
-    onVeganChange?.("일반");
+    onVeganChange?.(defaultVeganTypeId);
   };
 
-  const removeAllergyFilter = (item) => {
+  const removeAllergyFilter = allergenId => {
     const next = { ...currentAllergyFilters };
-    delete next[item];
+    delete next[String(allergenId)];
 
     onAllergyChange?.(next);
   };
@@ -79,17 +120,18 @@ function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChan
               </span>
             </div>
             <div className={styles.chipList}>
-              {allergyItems.map((item) => {
-                const state = currentAllergyFilters[item] || "none";
+              {sortedAllergyOptions.map(allergy => {
+                const filterKey = String(allergy.id);
+                const state = currentAllergyFilters[filterKey] || "none";
 
                 return (
                   <button
-                    key={item}
+                    key={allergy.id}
                     type="button"
                     className={`${styles.chip} ${styles.allergyChip} ${styles[state]} text-button-s`}
-                    onClick={() => handleAllergyClick(item)}
+                    onClick={() => handleAllergyClick(allergy.id)}
                   >
-                    {item}
+                    {allergy.name}
                   </button>
                 );
               })}
@@ -102,18 +144,18 @@ function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChan
             </div>
 
             <div className={styles.chipList}>
-              {veganItems.map((item) => {
-                const selected = currentVeganFilter === item;
+              {sortedVeganOptions.map(veganType => {
+                const selected = String(currentVeganFilter) === String(veganType.id);
                 return (
                   <button
-                    key={item}
+                    key={veganType.id}
                     type="button"
                     className={`${styles.chip} ${styles.veganChip} ${
                       selected ? styles.selected : ""
                     } text-button-s`}
-                    onClick={() => handleVeganClick(item)}
+                    onClick={() => handleVeganClick(veganType.id)}
                   >
-                    {item}
+                    {veganType.name}
                   </button>
                 );
               })}
@@ -133,16 +175,20 @@ function FilterPanel({ allergyFilters, onAllergyChange, veganFilter, onVeganChan
           </button>
         )}
 
-        {selectedAllergies.map(([item, state]) => (
-          <button
-            key={item}
-            type="button"
-            className={`${styles.chip} ${styles.allergyChip} ${styles[state]} text-button-s`}
-            onClick={() => removeAllergyFilter(item)}
-          >
-            {item}
-          </button>
-        ))}
+        {selectedAllergies.map(([allergenId, state]) => {
+          const allergy = allergyOptions.find(option => String(option.id) === String(allergenId));
+
+          return (
+            <button
+              key={allergenId}
+              type="button"
+              className={`${styles.chip} ${styles.allergyChip} ${styles[state]} text-button-s`}
+              onClick={() => removeAllergyFilter(allergenId)}
+            >
+              {allergy?.name ?? allergenId}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -4,7 +4,11 @@ import RecipeCardSkeleton from "../../components/recipe/RecipeCardSkeleton";
 import style from "./RecipeListPage.module.css";
 import { useEffect, useState } from "react";
 import { getRecips } from "../../services/recipeSearchService";
-import { filterRecipesByAllergies, filterRecipesByVeganType } from "../../utils/recipeFilter";
+import {
+  filterRecipesByAllergies,
+  filterRecipesByVeganType,
+  getAllergenIdsByFilterState,
+} from "../../utils/recipeFilter";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { getFavoriteRecipeIds, addFavorite, removeFavorite } from "../../services/favoriteService";
@@ -52,8 +56,14 @@ function RecipeListPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [sortType, setSortType] = useState("created");
 
-  const [veganFilter, setVeganFilter] = useState("일반");
+  const [veganFilter, setVeganFilter] = useState(null);
   const [allergyFilters, setAllergyFilters] = useState({});
+  const [filterOptions, setFilterOptions] = useState({
+    allergyOptions: [],
+    allergenCategoryMappings: [],
+    veganOptions: [],
+    veganTypeRestrictions: [],
+  });
   const [favoriteRecipeIds, setFavoriteRecipeIds] = useState(() => new Set());
   const [safetyConditions, setSafetyConditions] = useState(null);
 
@@ -73,11 +83,54 @@ function RecipeListPage() {
     setSearchParams({ q: nextKeyword });
   };
 
+  const defaultVeganTypeId =
+    filterOptions.veganOptions.find(veganType => veganType.name === "일반")?.id ?? null;
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadFilterOptions() {
+      const [allergensResult, veganTypesResult, mappingsResult, restrictionsResult] =
+        await Promise.all([
+          supabase.from("allergens").select("id, name").order("name"),
+          supabase.from("vegan_types").select("id, name").order("name"),
+          supabase.from("allergen_category_mappings").select("*"),
+          supabase.from("vegan_type_restrictions").select("*"),
+        ]);
+
+      if (!isActive) return;
+
+      const error =
+        allergensResult.error ??
+        veganTypesResult.error ??
+        mappingsResult.error ??
+        restrictionsResult.error;
+
+      if (error) {
+        console.error("[RecipeListPage] 필터 옵션 조회 실패:", error);
+        return;
+      }
+
+      setFilterOptions({
+        allergyOptions: allergensResult.data ?? [],
+        allergenCategoryMappings: mappingsResult.data ?? [],
+        veganOptions: veganTypesResult.data ?? [],
+        veganTypeRestrictions: restrictionsResult.data ?? [],
+      });
+    }
+
+    loadFilterOptions();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (authLoading) return;
 
     if (!authUser) {
-      setVeganFilter("일반");
+      setVeganFilter(defaultVeganTypeId);
       setAllergyFilters({});
       return;
     }
@@ -90,36 +143,23 @@ function RecipeListPage() {
         { data: allergyRows, error: allergyError },
       ] = await Promise.all([
         supabase.from("profiles").select("vegan_type_id").eq("id", authUser.id).maybeSingle(),
-        supabase.from("user_allergies").select("allergens(name)").eq("user_id", authUser.id),
+        supabase.from("user_allergies").select("allergen_id").eq("user_id", authUser.id),
       ]);
 
       if (!isActive) return;
 
       if (profileError) {
         console.error("[RecipeListPage] vegan_type_id 조회 실패:", profileError);
-      } else if (profileData?.vegan_type_id) {
-        const { data: veganTypeData, error: veganTypeError } = await supabase
-          .from("vegan_types")
-          .select("name")
-          .eq("id", profileData.vegan_type_id)
-          .maybeSingle();
-
-        if (!isActive) return;
-
-        if (veganTypeError) {
-          console.error("[RecipeListPage] vegan type 조회 실패:", veganTypeError);
-        } else {
-          setVeganFilter(veganTypeData?.name ?? "일반");
-        }
+      } else {
+        setVeganFilter(profileData?.vegan_type_id ?? defaultVeganTypeId);
       }
 
       if (allergyError) {
         console.error("[RecipeListPage] user_allergies 조회 실패:", allergyError);
       } else {
         const nextAllergyFilters = (allergyRows ?? []).reduce((acc, row) => {
-          const allergen = Array.isArray(row.allergens) ? row.allergens[0] : row.allergens;
-          if (allergen?.name) {
-            acc[allergen.name] = "exclude";
+          if (row.allergen_id != null) {
+            acc[String(row.allergen_id)] = "exclude";
           }
           return acc;
         }, {});
@@ -133,7 +173,7 @@ function RecipeListPage() {
     return () => {
       isActive = false;
     };
-  }, [authUser, authLoading]);
+  }, [authUser, authLoading, defaultVeganTypeId]);
 
   useEffect(() => {
     async function loadFavoriteIds() {
@@ -185,32 +225,40 @@ function RecipeListPage() {
     );
   };
 
-  const warningAllergyNames = Object.entries(allergyFilters)
-    .filter(([, state]) => state === "warning")
-    .map(([name]) => name);
-  const warningAllergenIds = (safetyConditions?.allergyOptions ?? [])
-    .filter((allergen) => warningAllergyNames.includes(allergen.name))
-    .map((allergen) => allergen.id);
+  const activeAllergyOptions =
+    safetyConditions?.allergyOptions?.length > 0
+      ? safetyConditions.allergyOptions
+      : filterOptions.allergyOptions;
+  const activeAllergenCategoryMappings =
+    safetyConditions?.allergenCategoryMappings ?? filterOptions.allergenCategoryMappings;
+  const activeVeganOptions =
+    safetyConditions?.veganOptions?.length > 0 ? safetyConditions.veganOptions : filterOptions.veganOptions;
+  const activeVeganTypeRestrictions =
+    safetyConditions?.veganTypeRestrictions ?? filterOptions.veganTypeRestrictions;
+  const selectedAllergenIds = getAllergenIdsByFilterState(allergyFilters, [
+    "warning",
+    "exclude",
+  ]);
 
-  const effectiveConditions = safetyConditions
-    ? {
-        ...safetyConditions,
-        allergenIds: [
-          ...new Set([
-            ...(safetyConditions.allergenIds ?? []).map(String),
-            ...warningAllergenIds.map(String),
-          ]),
-        ],
-      }
-    : null;
+  const effectiveConditions = {
+    allergenIds: [
+      ...new Set([...(safetyConditions?.allergenIds ?? []).map(String), ...selectedAllergenIds]),
+    ],
+    allergyOptions: activeAllergyOptions,
+    allergenCategoryMappings: activeAllergenCategoryMappings,
+    veganTypeId: veganFilter,
+    veganTypeRestrictions: activeVeganTypeRestrictions,
+  };
 
   const filteredRecipes = recipes.filter((recipe) => {
     if (!recipeMatchesKeyword(recipe, keyword)) return false;
 
     if (recipe.hasAiCustomRecipe) return true;
 
-    const passesAllergyFilter = filterRecipesByAllergies([recipe], allergyFilters).length > 0;
-    const passesVeganFilter = filterRecipesByVeganType([recipe], veganFilter).length > 0;
+    const passesAllergyFilter =
+      filterRecipesByAllergies([recipe], allergyFilters, activeAllergenCategoryMappings).length > 0;
+    const passesVeganFilter =
+      filterRecipesByVeganType([recipe], veganFilter, activeVeganTypeRestrictions).length > 0;
 
     return passesAllergyFilter && passesVeganFilter;
   });
@@ -262,6 +310,15 @@ function RecipeListPage() {
           })),
         );
 
+        if (conditions) {
+          setFilterOptions({
+            allergyOptions: conditions.allergyOptions ?? [],
+            allergenCategoryMappings: conditions.allergenCategoryMappings ?? [],
+            veganOptions: conditions.veganOptions ?? [],
+            veganTypeRestrictions: conditions.veganTypeRestrictions ?? [],
+          });
+        }
+
         setSafetyConditions(conditions);
         setVisibleCount(RECIPE_LOAD_COUNT);
       } catch (error) {
@@ -305,8 +362,10 @@ function RecipeListPage() {
         <FilterPanel
           allergyFilters={allergyFilters}
           onAllergyChange={setAllergyFilters}
+          allergyOptions={activeAllergyOptions}
           veganFilter={veganFilter}
           onVeganChange={setVeganFilter}
+          veganOptions={activeVeganOptions}
         />
         <div className={style.totalASortArea}>
           <h3 className="text-l">총 {filteredRecipes.length}개</h3>
