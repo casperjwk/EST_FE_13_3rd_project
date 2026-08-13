@@ -14,32 +14,32 @@ function Header() {
   const [profile, setProfile] = useState({ nickname: '', profileImageUrl: '' });
 
   useEffect(() => {
-    if (!user) {
-      setProfile({ nickname: '', profileImageUrl: '' });
-      return;
-    }
-    let isActive = true;
+    const fetchProfile = () => {
+      if (!user) {
+        setProfile({ nickname: '', profileImageUrl: '' });
+        return;
+      }
 
-    supabase
-      .from('profiles')
-      .select('nickname, profile_image_url')
-      .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!isActive) return;
-        if (error) {
-          console.error('[HankkiLab] Header profile fetch error:', error);
-          return;
-        }
-        setProfile({
-          nickname: data?.nickname ?? '',
-          profileImageUrl: data?.profile_image_url ?? '',
+      supabase
+        .from('profiles')
+        .select('nickname, profile_image_url')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('[HankkiLab] Header profile fetch error:', error);
+            return;
+          }
+          setProfile({
+            nickname: data?.nickname ?? '',
+            profileImageUrl: data?.profile_image_url ?? '',
+          });
         });
-      });
-
-    return () => {
-      isActive = false;
     };
+
+    fetchProfile();
+    window.addEventListener('profile-updated', fetchProfile);
+    return () => window.removeEventListener('profile-updated', fetchProfile);
   }, [user]);
 
   const closeMenu = () => setMenuOpen(false);
