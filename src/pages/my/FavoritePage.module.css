@@ -585,3 +585,66 @@
   background: rgba(168, 198, 134, 0.02);
   color: var(--primary);
 }
+
+/* 즐겨찾기 n개 - 페이지네이션 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 30px;
+}
+@media (min-width: 768px) {
+  .pagination {
+    margin-top: 40px;
+  }
+}
+
+.paginationArrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--primary);
+  background: var(--white-1);
+  color: var(--primary);
+}
+.paginationArrow:disabled {
+  border-color: var(--gray-2);
+  color: var(--gray-2);
+}
+.paginationArrow :global(.material-icons) {
+  font-size: 14px;
+}
+
+.paginationNumbers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paginationNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--gray-1);
+  background: var(--white-1);
+  color: var(--gray-3);
+  font-size: var(--small);
+  line-height: 150%;
+  font-weight: 600;
+}
+
+.paginationNumberActive {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--white-1);
+}
