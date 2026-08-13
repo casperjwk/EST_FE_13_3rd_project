@@ -42,17 +42,28 @@ const DashboardChart = () => {
   useEffect(() => {
     const fetchChartData = async () => {
       try {
-        // 1. 도넛 차트용: 유저 알레르기 분포 집계
-        const { data: userAllergiesData } = await supabase.from("user_allergies").select("allergen_id");
-        const { data: allergensList } = await supabase.from("allergens").select("id, name");
+        // 1. 도넛 차트용: 모든 회원이 등록한 알레르기 전체 데이터와 알레르기 마스터 목록 가져오기
+        const { data: userAllergiesData, error: allergyError } = await supabase
+          .from("user_allergies")
+          .select("allergen_id");
+
+        if (allergyError) throw allergyError;
+
+        const { data: allergensList, error: allergensListError } = await supabase.from("allergens").select("id, name");
+
+        if (allergensListError) throw allergensListError;
 
         if (userAllergiesData && allergensList) {
+          // 알레르기 ID별로 몇 명이나 체크했는지 빈도수 집계
           const counts = {};
           userAllergiesData.forEach(item => {
-            counts[item.allergen_id] = (counts[item.allergen_id] || 0) + 1;
+            const id = item.allergen_id;
+            counts[id] = (counts[id] || 0) + 1;
           });
 
-          const totalCount = userAllergiesData.length;
+          // 전체 체크된 알레르기 총 개수 (비율 계산용 분모)
+          const totalCheckCount = userAllergiesData.length;
+
           const colorPalette = [
             colors.primary,
             colors.secondary,
@@ -62,17 +73,20 @@ const DashboardChart = () => {
             colors.gray2,
           ];
 
+          // 각 알레르기별 비율(%) 계산
           const calculatedPieData = allergensList
             .map((allergen, index) => {
               const count = counts[allergen.id] || 0;
-              const percentage = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
+              // 전체 중 해당 알레르기가 차지하는 퍼센티지 계산
+              const percentage = totalCheckCount > 0 ? Math.round((count / totalCheckCount) * 100) : 0;
               return {
                 name: allergen.name,
                 value: percentage,
+                count: count, // 실제 체크된 인원 수도 함께 보관
                 color: colorPalette[index % colorPalette.length],
               };
             })
-            .filter(item => item.value > 0);
+            .filter(item => item.value > 0); // 0%인 것은 제외
 
           if (calculatedPieData.length > 0) {
             setPieData(calculatedPieData);
@@ -81,62 +95,43 @@ const DashboardChart = () => {
           }
         }
 
-        // 2. 꺾은선 차트용: 실제 회원 수(17명) 규모에 맞춘 최근 6개월 성장 데이터 생성
-        const { count: realUserCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-        const currentTotal = realUserCount || 17; // 현재 실제 회원 수
+        // 2. 꺾은선 차트용: profiles 테이블에서 실제 가입일(created_at) 가져와서 월별 누적 집계
+        const { data: profilesData, error: profileError } = await supabase.from("profiles").select("created_at");
 
-        // 전체 1~12월 데이터 뼈대 (실제 회원 수 규모에 비례하도록 설정)
-        const fullYearData = [
-          {
-            month: "1월",
-            userCount: Math.max(1, Math.round(currentTotal * 0.1)),
-            aiCount: Math.round(currentTotal * 0.5),
-          },
-          {
-            month: "2월",
-            userCount: Math.max(2, Math.round(currentTotal * 0.2)),
-            aiCount: Math.round(currentTotal * 1.0),
-          },
-          {
-            month: "3월",
-            userCount: Math.max(3, Math.round(currentTotal * 0.35)),
-            aiCount: Math.round(currentTotal * 2.0),
-          },
-          {
-            month: "4월",
-            userCount: Math.max(5, Math.round(currentTotal * 0.5)),
-            aiCount: Math.round(currentTotal * 3.5),
-          },
-          {
-            month: "5월",
-            userCount: Math.max(8, Math.round(currentTotal * 0.65)),
-            aiCount: Math.round(currentTotal * 5.0),
-          },
-          {
-            month: "6월",
-            userCount: Math.max(10, Math.round(currentTotal * 0.8)),
-            aiCount: Math.round(currentTotal * 7.0),
-          },
-          {
-            month: "7월",
-            userCount: Math.max(13, Math.round(currentTotal * 0.9)),
-            aiCount: Math.round(currentTotal * 9.0),
-          },
-          { month: "8월", userCount: currentTotal, aiCount: 459 }, // 현재 실제 회원 수 및 최신 AI 요청량 연동
-          { month: "9월", userCount: null, aiCount: null },
-          { month: "10월", userCount: null, aiCount: null },
-          { month: "11월", userCount: null, aiCount: null },
-          { month: "12월", userCount: null, aiCount: null },
-        ];
+        if (profileError) throw profileError;
 
-        // 현재 날짜 기준(8월)으로 최근 6개월(3월~8월)만 잘라내기
+        const monthlyCounts = Array(12).fill(0);
+
+        if (profilesData) {
+          profilesData.forEach(profile => {
+            if (profile.created_at) {
+              const date = new Date(profile.created_at);
+              const monthIndex = date.getMonth();
+              if (monthIndex >= 0 && monthIndex < 12) {
+                monthlyCounts[monthIndex] += 1;
+              }
+            }
+          });
+        }
+
+        let cumulativeUsers = 0;
+        const fullYearData = monthlyCounts.map((count, index) => {
+          cumulativeUsers += count;
+          const monthStr = `${index + 1}월`;
+
+          return {
+            month: monthStr,
+            userCount: cumulativeUsers,
+            aiCount: 0, // AI 검색량은 임시값 제거 후 0으로 깔끔하게 처리
+          };
+        });
+
         const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1; // 현재 8월 (8)
-
+        const currentMonth = currentDate.getMonth() + 1;
         const startIndex = Math.max(0, currentMonth - 6);
         const endIndex = currentMonth;
-        const generatedLineData = fullYearData.slice(startIndex, endIndex);
 
+        const generatedLineData = fullYearData.slice(startIndex, endIndex);
         setLineData(generatedLineData);
       } catch (err) {
         console.error("차트 데이터 연동 오류:", err);
@@ -181,10 +176,12 @@ const DashboardChart = () => {
                 boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
                 fontSize: "var(--small)",
               }}
-              formatter={(value, name) => [
-                `${value.toLocaleString()}명`,
-                name === "userCount" ? "가입 회원 수" : "실시간 AI 변환 요청량",
-              ]}
+              formatter={(value, name) => {
+                if (name === "userCount" || name === "가입 회원 수") {
+                  return [`${value.toLocaleString()}명`, "가입 회원 수"];
+                }
+                return [`${value.toLocaleString()}회`, "실시간 AI 변환 요청량"];
+              }}
             />
             <Legend
               verticalAlign="bottom"
@@ -242,7 +239,7 @@ const DashboardChart = () => {
                 border: "1px solid var(--gray-1)",
                 fontSize: "var(--small)",
               }}
-              formatter={value => [`${value}%`, "비율"]}
+              formatter={(value, name, item) => [`${value}% (${item.payload.count}명)`, item.payload.name]}
             />
             <Legend
               layout="vertical"

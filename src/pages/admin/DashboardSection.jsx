@@ -148,7 +148,7 @@ const DashboardSection = () => {
           allergyRatio: allergyPercentage,
           veganUsers: veganUsersCount || 0,
           totalRecipes: currentRecipes,
-          monthlyAiSearches: currentRecipes * 12 + currentUsers * 15,
+          monthlyAiSearches: 0, // 가짜 계산을 제거하고 실제 통계 연동 전까지 0으로 설정
         });
       } catch (err) {
         console.error("❌ 대시보드 통계 조회 치명적 오류:", err);

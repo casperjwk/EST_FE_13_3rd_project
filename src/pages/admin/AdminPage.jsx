@@ -42,6 +42,23 @@ const UserDietIcon = () => (
   </svg>
 );
 
+// 레시피 추가 페이지로 이동할 때 쓸 플러스 아이콘
+const PlusIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+  </svg>
+);
+
 const SettingsIcon = () => (
   <svg
     width="18"
@@ -97,7 +114,6 @@ const AdminPage = () => {
         console.log("현재 로그인한 유저 ID:", user.id);
 
         // 2. Supabase admins 테이블에서 현재 유저의 ID가 등록되어 있는지 조회
-        // (만약 admins 테이블 컬럼명이 user_id가 아니라 id라면 .eq("id", user.id)로 수정해 주세요)
         const { data: adminData, error: adminError } = await supabase
           .from("admins")
           .select("*")
@@ -159,6 +175,17 @@ const AdminPage = () => {
             >
               <UserDietIcon />
               <span>회원 식단 관리</span>
+            </button>
+
+            {/* /create 페이지로 이동하는 레시피 추가 버튼 */}
+            <button
+              className={styles.navItem}
+              onClick={() => {
+                window.location.href = "/create";
+              }}
+            >
+              <PlusIcon />
+              <span>레시피 추가</span>
             </button>
           </div>
 
