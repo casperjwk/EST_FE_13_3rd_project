@@ -340,7 +340,7 @@ async function callAlan(prompt: string) {
     headers: {
       Accept: "application/json, text/plain",
     },
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(60_000),
   });
 
   const responseText = await response.text();
