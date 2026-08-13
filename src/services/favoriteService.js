@@ -12,7 +12,10 @@ export async function getFavoriteRecipes(userId) {
         image_url,
         difficulty,
         cooking_time,
-        servings
+        servings,
+        recipe_ingredients (
+          ingredients (name, category_id)
+        )
       )
     `)
     .eq("user_id", userId);
@@ -22,6 +25,25 @@ export async function getFavoriteRecipes(userId) {
   }
 
   return (data ?? []).map(row => row.recipes);
+}
+
+// 즐겨찾기한 레시피들 중 이미 AI 대체 레시피가 저장돼 있는지 확인 (원본 레시피 id 기준)
+export async function getCustomRecipeCacheEntries(userId, recipeIds) {
+  if (!recipeIds || recipeIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("ai_custom_recipes")
+    .select("original_recipe_id, vegan_type_id, ai_custom_recipe_allergies (allergen_id)")
+    .eq("user_id", userId)
+    .in("original_recipe_id", recipeIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
 }
 
 export async function getFavoriteRecipeIds(userId) {
