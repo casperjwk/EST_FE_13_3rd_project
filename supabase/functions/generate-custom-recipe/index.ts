@@ -217,25 +217,91 @@ DATA=${JSON.stringify(input)}`;
   throw new Error("Alan prompt is too long after URL encoding");
 }
 
-async function callAlan(prompt: string) {
-  const base = Deno.env.get("ALAN_API_BASE_URL") ?? ALAN_API_DEFAULT;
-  const clientId = Deno.env.get("ALAN_CLIENT_ID");
-  if (!clientId) throw new Error("ALAN_CLIENT_ID is not configured");
-
+async function requestAlan(base: string, clientId: string, prompt: string) {
   const url = new URL(`${base.replace(/\/$/, "")}/question`);
   url.searchParams.set("content", prompt);
   url.searchParams.set("client_id", clientId);
 
   const response = await fetch(url, {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json, text/plain" },
     signal: AbortSignal.timeout(60_000),
   });
-  const data = await response.json().catch(() => null);
+
+  const responseText = await response.text();
+  let responseData: unknown = responseText;
+
+  try {
+    responseData = JSON.parse(responseText);
+  } catch {
+    // JSON이 아닌 오류 응답도 진단할 수 있도록 문자열을 유지합니다.
+  }
+
+  return { response, responseData };
+}
+
+async function resetAlanState(base: string, clientId: string) {
+  const response = await fetch(`${base.replace(/\/$/, "")}/reset-state`, {
+    method: "DELETE",
+    headers: {
+      Accept: "application/json, text/plain",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ client_id: clientId }),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  const responseText = await response.text();
+  let responseData: unknown = responseText;
+
+  try {
+    responseData = JSON.parse(responseText);
+  } catch {
+    // 본문이 없는 204 응답이나 일반 문자열 응답을 허용합니다.
+  }
+
   if (!response.ok) {
-    console.error("Alan request failed", { status: response.status });
+    console.error("Alan state reset failed", {
+      status: response.status,
+      statusText: response.statusText,
+      responseData,
+    });
+    return false;
+  }
+
+  console.info("Alan state reset completed", { status: response.status });
+  return true;
+}
+
+async function callAlan(prompt: string) {
+  const base = Deno.env.get("ALAN_API_BASE_URL") ?? ALAN_API_DEFAULT;
+  const clientId = Deno.env.get("ALAN_CLIENT_ID");
+  if (!clientId) throw new Error("ALAN_CLIENT_ID is not configured");
+
+  let { response, responseData } = await requestAlan(base, clientId, prompt);
+
+  if (!response.ok) {
+    console.error("Alan request failed", {
+      status: response.status,
+      statusText: response.statusText,
+      responseData,
+    });
+
+    if (response.status === 500 && (await resetAlanState(base, clientId))) {
+      console.info("Retrying Alan request once after state reset");
+      ({ response, responseData } = await requestAlan(base, clientId, prompt));
+    }
+  }
+
+  if (!response.ok) {
+    console.error("Alan request ultimately failed", {
+      status: response.status,
+      statusText: response.statusText,
+      responseData,
+    });
     throw new Error(`Alan API returned ${response.status}`);
   }
-  const answer = extractAlanAnswer(data);
+
+  const answer = extractAlanAnswer(responseData);
   if (!answer) throw new Error("Alan response has no answer or content");
   return parseAiRecipe(answer);
 }
