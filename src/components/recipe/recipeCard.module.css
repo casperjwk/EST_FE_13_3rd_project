@@ -76,8 +76,14 @@
   height: 50%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
   padding: 20px;
+}
+
+.cardContentLink {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .cardInfoArea {
@@ -176,20 +182,16 @@
 
 .recipeStatusLeft :global(.material-symbols-outlined),
 .recipeStatusAction :global(.material-symbols-outlined) {
-  font-size: 15px;
   flex-shrink: 0;
 }
 
 .recipeStatusLeft p {
   margin: 0;
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .recipeStatusLeft span:not(.material-symbols-outlined) {
   display: block;
   margin-top: 2px;
-  font-size: 11px;
   color: var(--gray-3);
 }
 
@@ -198,8 +200,6 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .statusSafe {

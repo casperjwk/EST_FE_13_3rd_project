@@ -237,7 +237,7 @@ function RecipeListPage() {
       : filterOptions.veganOptions;
   const activeVeganTypeRestrictions =
     safetyConditions?.veganTypeRestrictions ?? filterOptions.veganTypeRestrictions;
-  const selectedAllergenIds = getAllergenIdsByFilterState(allergyFilters, ["warning", "exclude"]);
+  const selectedAllergenIds = getAllergenIdsByFilterState(allergyFilters, ["exclude"]);
   const statusVeganTypeId = safetyConditions?.veganTypeId ?? veganFilter;
 
   const effectiveConditions = {
