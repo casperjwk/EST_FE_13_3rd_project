@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -7,7 +7,7 @@ import {
   removeFavorite,
   getFavoriteCounts,
 } from '../../services/favoriteService';
-import { getPopularRecipes, getRecipesByIds, getRecipesByVeganType } from '../../services/recipeService';
+import { getRecipesByVeganType } from '../../services/recipeService';
 import { getUserSafetyConditions, getRecipeSafetyStatus } from '../../utils/recipeSafety';
 import hero1 from '../../assets/hero1.png';
 import hero2 from '../../assets/hero2.png';
@@ -36,7 +36,7 @@ const SLIDES = [
 ];
 
 const STEPS = [
-  { icon: 'assignment', title: '알레르기·비건 정보 입력', desc: '내 조건을 한 번만 등록하면 끝' },
+  { icon: 'assignment', title: '알레르기·식단 정보 입력', desc: '내 조건을 한 번만 등록하면 끝' },
   { icon: 'smart_toy', title: 'AI가 재료 분석', desc: '등록된 정보 기준 위험 재료 확인' },
   { icon: 'restaurant', title: '맞춤 레시피 추천', desc: '대체재료까지 함께 제안받기' },
 ];
@@ -56,7 +56,6 @@ const VEGAN_TAB_ID_MAP = {
   '락토-오보': 'lacto_ovo',
 };
 
-// recipeSafety.js의 safetyType -> 새 RecipeCard의 status 값 매핑
 const SAFETY_TYPE_TO_STATUS = {
   danger: 'warning',
   needReplacement: 'replaceable',
@@ -68,13 +67,29 @@ function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Hero 검색/필터칩
   const [searchValue, setSearchValue] = useState('');
   const [heroConditions, setHeroConditions] = useState({ veganTypeName: '', allergyNames: [] });
 
-  // 공통: 유저 안전조건 + 즐겨찾기 id 목록
   const [conditions, setConditions] = useState(null);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
+
+  // 전체 레시피 + 전체 좋아요 수 (한 번만 불러와서 로컬에서 정렬/필터링)
+  const [allRecipes, setAllRecipes] = useState([]);
+  const [allCounts, setAllCounts] = useState({});
+
+  useEffect(() => {
+    let isActive = true;
+    getRecipesByVeganType(null, 9999).then(async (recipes) => {
+      if (!isActive) return;
+      setAllRecipes(recipes);
+      const counts = await getFavoriteCounts(recipes.map((r) => r.id));
+      if (!isActive) return;
+      setAllCounts(counts);
+    });
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -113,6 +128,8 @@ function HomePage() {
     } else {
       await addFavorite(user.id, recipeId);
     }
+    const delta = isFav ? -1 : 1;
+
     setFavoriteIds((prev) => {
       const next = new Set(prev);
       if (isFav) {
@@ -122,6 +139,8 @@ function HomePage() {
       }
       return next;
     });
+
+    setAllCounts((prev) => ({ ...prev, [recipeId]: Math.max(0, (prev[recipeId] ?? 0) + delta) }));
   };
 
   const handleSearch = () => {
@@ -129,63 +148,29 @@ function HomePage() {
     navigate(`/recipes?q=${encodeURIComponent(searchValue.trim())}`);
   };
 
-  // 즐겨찾기 섹션
-  const [displayedFavorites, setDisplayedFavorites] = useState([]);
-  const [favoriteCounts, setFavoriteCounts] = useState({});
+  // 좋아요 많은 순 상위 4개 (allCounts 바뀔 때마다 자동 재계산)
+  const popularRecipes = useMemo(
+    () =>
+      [...allRecipes].sort((a, b) => (allCounts[b.id] ?? 0) - (allCounts[a.id] ?? 0)).slice(0, 4),
+    [allRecipes, allCounts],
+  );
 
-  useEffect(() => {
-    if (!user || favoriteIds.size === 0) {
-      setDisplayedFavorites([]);
-      setFavoriteCounts({});
-      return;
-    }
-    let isActive = true;
-    const ids = Array.from(favoriteIds);
+  // 즐겨찾기한 레시피 (favoriteIds 바뀔 때마다 자동 재계산)
+  const displayedFavorites = useMemo(
+    () => allRecipes.filter((recipe) => favoriteIds.has(recipe.id)),
+    [allRecipes, favoriteIds],
+  );
 
-    Promise.all([getRecipesByIds(ids), getFavoriteCounts(ids)]).then(([recipes, counts]) => {
-      if (!isActive) return;
-      setDisplayedFavorites(recipes);
-      setFavoriteCounts(counts);
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, [user, favoriteIds]);
-
-  // 인기 레시피 섹션
-  const [popularRecipes, setPopularRecipes] = useState([]);
-  const [popularCounts, setPopularCounts] = useState({});
-
-  useEffect(() => {
-    let isActive = true;
-
-    getPopularRecipes(4).then(async (recipes) => {
-      if (!isActive) return;
-      setPopularRecipes(recipes);
-      const counts = await getFavoriteCounts(recipes.map((r) => r.id));
-      if (!isActive) return;
-      setPopularCounts(counts);
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
-
-  // 비건 유형별 추천 섹션
+  // 비건 유형별 추천 섹션 (탭별로 서버에서 다시 필터링)
   const [activeVeganTab, setActiveVeganTab] = useState('전체');
   const [showAllVeganTabs, setShowAllVeganTabs] = useState(false);
   const [veganLoading, setVeganLoading] = useState(false);
   const [veganRecipes, setVeganRecipes] = useState([]);
-  const [veganCounts, setVeganCounts] = useState({});
 
   const loadVeganRecipes = async (tab) => {
     setVeganLoading(true);
     const recipes = await getRecipesByVeganType(VEGAN_TAB_ID_MAP[tab], 3);
     setVeganRecipes(recipes);
-    const counts = await getFavoriteCounts(recipes.map((r) => r.id));
-    setVeganCounts(counts);
     setVeganLoading(false);
   };
 
@@ -367,7 +352,7 @@ function HomePage() {
                   description={recipe.description}
                   time={recipe.cooking_time}
                   serves={recipe.servings}
-                  likes={favoriteCounts[recipe.id] ?? 0}
+                  likes={allCounts[recipe.id] ?? 0}
                   isFavorite={true}
                   onFavoriteClick={() => toggleFavorite(recipe.id)}
                   status={SAFETY_TYPE_TO_STATUS[safety.safetyType]}
@@ -394,7 +379,7 @@ function HomePage() {
                   description={recipe.description}
                   time={recipe.cooking_time}
                   serves={recipe.servings}
-                  likes={popularCounts[recipe.id] ?? 0}
+                  likes={allCounts[recipe.id] ?? 0}
                   isFavorite={favoriteIds.has(recipe.id)}
                   onFavoriteClick={() => toggleFavorite(recipe.id)}
                   status={SAFETY_TYPE_TO_STATUS[safety.safetyType]}
@@ -464,7 +449,7 @@ function HomePage() {
                     description={recipe.description}
                     time={recipe.cooking_time}
                     serves={recipe.servings}
-                    likes={veganCounts[recipe.id] ?? 0}
+                    likes={allCounts[recipe.id] ?? 0}
                     isFavorite={favoriteIds.has(recipe.id)}
                     onFavoriteClick={() => toggleFavorite(recipe.id)}
                     status={SAFETY_TYPE_TO_STATUS[safety.safetyType]}
