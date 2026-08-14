@@ -158,8 +158,8 @@
   color: var(--gray-3);
 }
 .profileCardAvatarDelete:hover {
-  border-color: var(--danger);
-  color: var(--danger);
+  border-color: var(--black-1);
+  color: var(--black-1);
 }
 .profileCardAvatarDelete :global(.material-icons) {
   font-size: 12px;
@@ -795,6 +795,7 @@
   gap: 15px;
   overflow-x: auto;
   scrollbar-width: none;
+  cursor: grab;
 }
 
 .recentScroll::-webkit-scrollbar {

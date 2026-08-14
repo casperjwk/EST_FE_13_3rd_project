@@ -1,100 +1,77 @@
-const VEGAN_EXCLUDE_CATEGORY_IDS = {
-  일반: [],
-  플렉시테리언: [],
-  폴로: ["pork", "beef", "meat", "fish", "shrimp", "crab", "shellfish", "seafood"],
-  페스코: ["pork", "chicken", "beef", "meat"],
-  "락토-오보": [
-    "pork",
-    "chicken",
-    "beef",
-    "meat",
-    "fish",
-    "shrimp",
-    "crab",
-    "shellfish",
-    "seafood",
-  ],
-  락토: [
-    "pork",
-    "chicken",
-    "beef",
-    "meat",
-    "fish",
-    "shrimp",
-    "crab",
-    "shellfish",
-    "seafood",
-    "eggs",
-  ],
-  오보: [
-    "pork",
-    "chicken",
-    "beef",
-    "meat",
-    "fish",
-    "shrimp",
-    "crab",
-    "shellfish",
-    "seafood",
-    "dairy",
-  ],
-  비건: [
-    "pork",
-    "chicken",
-    "beef",
-    "meat",
-    "fish",
-    "shrimp",
-    "crab",
-    "shellfish",
-    "seafood",
-    "dairy",
-    "eggs",
-    "honey",
-  ],
-};
+function toId(value) {
+  return value == null ? "" : String(value);
+}
 
-export function filterRecipesByVeganType(recipes, veganType) {
-  const excludeIds = VEGAN_EXCLUDE_CATEGORY_IDS[veganType] ?? [];
+function getMappingCategoryId(mapping) {
+  return mapping.category_id ?? mapping.food_category_id;
+}
 
-  if (excludeIds.length === 0) {
+function filterRecipesByExcludedCategoryIds(recipes, excludeCategoryIds) {
+  const excludeSet = new Set(excludeCategoryIds.map(toId).filter(Boolean));
+
+  if (excludeSet.size === 0) {
     return recipes;
   }
 
   return recipes.filter(
-    (recipe) => !recipe.categoryIds?.some((categoryId) => excludeIds.includes(categoryId)),
+    recipe => !recipe.categoryIds?.some(categoryId => excludeSet.has(toId(categoryId))),
   );
 }
 
-const ALLERGY_CATEGORY_IDS = {
-  우유: "dairy",
-  생선: "fish",
-  달걀: "eggs",
-  복숭아: "peach",
-  밀: "wheat",
-  토마토: "tomato",
-  대두: "soy",
-  땅콩: "peanut",
-  돼지고기: "pork",
-  견과류: "nuts",
-  닭고기: "chicken",
-  새우: "shrimp",
-  소고기: "beef",
-  게: "crab",
-  조개류: "shellfish",
-};
+export function getAllergenIdsByFilterState(allergyFilters, targetStates) {
+  const stateSet = new Set(targetStates);
 
-export function filterRecipesByAllergies(recipes, allergyFilters) {
-  const excludeCategoryIds = Object.entries(allergyFilters)
-    .filter(([, state]) => state === "exclude")
-    .map(([name]) => ALLERGY_CATEGORY_IDS[name])
+  return Object.entries(allergyFilters ?? {})
+    .filter(([, state]) => stateSet.has(state))
+    .map(([allergenId]) => toId(allergenId))
     .filter(Boolean);
+}
 
-  if (excludeCategoryIds.length === 0) {
+export function getCategoryIdsByAllergenIds(allergenIds, allergenCategoryMappings) {
+  const allergenIdSet = new Set((allergenIds ?? []).map(toId).filter(Boolean));
+
+  if (allergenIdSet.size === 0) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      (allergenCategoryMappings ?? [])
+        .filter(mapping => allergenIdSet.has(toId(mapping.allergen_id)))
+        .map(getMappingCategoryId)
+        .map(toId)
+        .filter(Boolean),
+    ),
+  ];
+}
+
+export function filterRecipesByAllergies(
+  recipes,
+  allergyFilters,
+  allergenCategoryMappings = [],
+) {
+  const excludeAllergenIds = getAllergenIdsByFilterState(allergyFilters, ["exclude"]);
+  const excludeCategoryIds = getCategoryIdsByAllergenIds(
+    excludeAllergenIds,
+    allergenCategoryMappings,
+  );
+
+  return filterRecipesByExcludedCategoryIds(recipes, excludeCategoryIds);
+}
+
+export function filterRecipesByVeganType(
+  recipes,
+  veganTypeId,
+  veganTypeRestrictions = [],
+) {
+  if (veganTypeId == null || veganTypeId === "") {
     return recipes;
   }
 
-  return recipes.filter(
-    (recipe) => !recipe.categoryIds?.some((categoryId) => excludeCategoryIds.includes(categoryId)),
-  );
+  const excludeCategoryIds = (veganTypeRestrictions ?? [])
+    .filter(restriction => toId(restriction.vegan_type_id) === toId(veganTypeId))
+    .map(getMappingCategoryId)
+    .filter(Boolean);
+
+  return filterRecipesByExcludedCategoryIds(recipes, excludeCategoryIds);
 }

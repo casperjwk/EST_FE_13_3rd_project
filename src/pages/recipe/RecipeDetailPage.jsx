@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import Badge from "../../components/common/Badge";
+import NotFoundPage from "../notfound/NotFoundPage";
 import { supabase } from "../../lib/supabase";
 import styles from "./RecipeDetailPage.module.css";
 import "material-icons/iconfont/filled.css";
 import { recordRecipeView } from "../../services/recentViewService";
 import { generateCustomRecipe, getCachedCustomRecipe } from "../../services/aiRecipeService";
-import { addFavorite, getFavoriteRecipeIds, removeFavorite } from "../../services/favoriteService";
+import {
+  addFavorite,
+  getFavoriteCounts,
+  getFavoriteRecipeIds,
+  removeFavorite,
+} from "../../services/favoriteService";
 
 const VEGAN_TYPE_ORDER = [
   "general",
@@ -20,6 +26,7 @@ const VEGAN_TYPE_ORDER = [
 ];
 
 const INGREDIENT_CHECK_CATEGORY_IDS = new Set(["condiments", "kimchi", "meat", "seasoning"]);
+const RECIPE_NOT_FOUND_ERROR = "recipe-not-found";
 
 function sortVeganTypes(veganTypes) {
   const orderById = new Map(VEGAN_TYPE_ORDER.map((id, index) => [id, index]));
@@ -457,6 +464,7 @@ function RecipeDetailPage() {
   const [isUserConditionsLoading, setIsUserConditionsLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isFavoriteUpdating, setIsFavoriteUpdating] = useState(false);
+  const [favoriteCount, setFavoriteCount] = useState(0);
   const [recipeQuestion, setRecipeQuestion] = useState("");
   const [questionMessages, setQuestionMessages] = useState([]);
   const [isQuestionLoading, setIsQuestionLoading] = useState(false);
@@ -567,12 +575,13 @@ function RecipeDetailPage() {
 
     async function loadRecipe() {
       if (!id) {
-        setRecipeError("레시피 ID가 없습니다.");
+        setRecipeError(RECIPE_NOT_FOUND_ERROR);
         setIsRecipeLoading(false);
         return;
       }
 
       setIsRecipeLoading(true);
+      setRecipe(null);
       setRecipeError("");
       try {
         const { data, error } = await supabase
@@ -608,9 +617,11 @@ function RecipeDetailPage() {
         if (!isActive) return;
         if (error) {
           console.error("[HankkiLab] Recipe detail error:", error);
-          setRecipeError("레시피를 불러오지 못했습니다.");
+          setRecipeError(
+            error.code === "22P02" ? RECIPE_NOT_FOUND_ERROR : "레시피를 불러오지 못했습니다.",
+          );
         } else if (!data) {
-          setRecipeError("존재하지 않는 레시피입니다.");
+          setRecipeError(RECIPE_NOT_FOUND_ERROR);
         } else {
           setRecipe(data);
           setAnalysisState("before");
@@ -625,13 +636,38 @@ function RecipeDetailPage() {
       } catch (error) {
         if (!isActive) return;
         console.error("[HankkiLab] Recipe detail request failed:", error);
-        setRecipeError("레시피를 불러오지 못했습니다.");
+        setRecipeError(
+          error?.code === "22P02" ? RECIPE_NOT_FOUND_ERROR : "레시피를 불러오지 못했습니다.",
+        );
       } finally {
         if (isActive) setIsRecipeLoading(false);
       }
     }
 
     loadRecipe();
+    return () => {
+      isActive = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadFavoriteCount() {
+      if (!id) return;
+
+      try {
+        const counts = await getFavoriteCounts([id]);
+        if (isActive) {
+          setFavoriteCount(Number(counts[id] ?? 0));
+        }
+      } catch (error) {
+        console.error("[HankkiLab] Favorite count load error:", error);
+      }
+    }
+
+    void loadFavoriteCount();
+
     return () => {
       isActive = false;
     };
@@ -977,13 +1013,16 @@ function RecipeDetailPage() {
     setIsFavoriteUpdating(true);
 
     try {
+      const wasFavorite = isFavorite;
+
       if (isFavorite) {
         await removeFavorite(session.user.id, recipe.id);
       } else {
         await addFavorite(session.user.id, recipe.id);
       }
 
-      setIsFavorite(current => !current);
+      setIsFavorite(!wasFavorite);
+      setFavoriteCount(current => Math.max(0, current + (wasFavorite ? -1 : 1)));
     } catch (error) {
       console.error("[HankkiLab] Favorite update error:", error);
       alert("즐겨찾기 상태를 변경하지 못했습니다. 다시 시도해 주세요.");
@@ -1112,6 +1151,10 @@ function RecipeDetailPage() {
 
   if (isRecipeLoading || isUserConditionsLoading || isConditionDataLoading) {
     return <RecipeDetailSkeleton />;
+  }
+
+  if (recipeError === RECIPE_NOT_FOUND_ERROR) {
+    return <NotFoundPage />;
   }
 
   if (recipeError) {
@@ -1285,7 +1328,7 @@ function RecipeDetailPage() {
                 <span className={cn("safe-badge", difficultyColorClass)}>{difficultyLabel}</span>
                 <span className={cn("favorite-count")}>
                   <Icon name="heart" size={16} />
-                  10
+                  {favoriteCount}
                 </span>
                 <button
                   className={cn("favorite-button", isFavorite ? "favorite-button--active" : "")}

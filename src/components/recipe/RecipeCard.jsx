@@ -101,7 +101,7 @@ function RecipeCard({
       </div>
       <div className={styles.cardTextArea}>
         <Link to={recipePath} className={styles.cardContentLink}>
-          <h4 className={`${styles.cardTitle} text-subtitle-s`}>{name}</h4>
+          <h4 className={`${styles.cardTitle} text-subtitle-m`}>{name}</h4>
           <p className={`${styles.cardDescription} text-s`}>{description}</p>
 
           <div className={styles.cardInfoArea}>
@@ -129,19 +129,19 @@ function RecipeCard({
             onClick={handleStatusClick}
           >
             <div className={styles.recipeStatusLeft}>
-              <span className="material-symbols-outlined" aria-hidden="true">
+              <span className="material-symbols-outlined text-l" aria-hidden="true">
                 auto_fix_high
               </span>
 
               <div>
-                <p>{statusInfo.title}</p>
-                <span>{statusInfo.description}</span>
+                <p className="text-s">{statusInfo.title}</p>
+                <span className="text-s">{statusInfo.description}</span>
               </div>
             </div>
 
             <div className={styles.recipeStatusAction}>
-              <span>{statusInfo.action}</span>
-              <span className="material-symbols-outlined" aria-hidden="true">
+              <span className="text-button-xs">{statusInfo.action}</span>
+              <span className="material-symbols-outlined text-button-xs" aria-hidden="true">
                 {statusInfo.icon}
               </span>
             </div>
