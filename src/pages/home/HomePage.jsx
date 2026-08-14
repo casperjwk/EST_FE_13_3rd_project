@@ -64,6 +64,7 @@ const SAFETY_TYPE_TO_STATUS = {
 
 function HomePage() {
   const [current, setCurrent] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -118,6 +119,14 @@ function HomePage() {
       isActive = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (isPaused) return;
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % SLIDES.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [current, isPaused]);
 
   const toggleFavorite = async (recipeId) => {
     if (!user) return;
@@ -188,7 +197,11 @@ function HomePage() {
             AI 기반 맞춤 레시피 서비스
           </div>
 
-          <div className={styles['home-hero__track-wrapper']}>
+          <div
+            className={styles['home-hero__track-wrapper']}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
             <div
               className={styles['home-hero__track']}
               style={{
