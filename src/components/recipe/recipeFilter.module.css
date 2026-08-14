@@ -49,11 +49,6 @@
   text-align: center;
 }
 
-.warning {
-  border-color: var(--warning);
-  color: var(--warning);
-}
-
 .exclude {
   border-color: var(--danger);
   color: var(--danger);
