@@ -1,14 +1,18 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
-import { getFavoriteRecipeIds, removeFavorite, getFavoriteCounts } from '../../services/favoriteService';
+import {
+  getFavoriteRecipeIds,
+  addFavorite,
+  removeFavorite,
+  getFavoriteCounts,
+} from '../../services/favoriteService';
 import { getPopularRecipes, getRecipesByIds, getRecipesByVeganType } from '../../services/recipeService';
 import { getUserSafetyConditions, getRecipeSafetyStatus } from '../../utils/recipeSafety';
 import hero1 from '../../assets/hero1.png';
 import hero2 from '../../assets/hero2.png';
 import hero3 from '../../assets/hero3.png';
 import RecipeCard from '../../components/recipe/RecipeCard';
-import FavoriteRecipeCard from './FavoriteRecipeCard';
 import styles from './HomePage.module.css';
 
 const SLIDES = [
@@ -52,6 +56,13 @@ const VEGAN_TAB_ID_MAP = {
   '락토-오보': 'lacto_ovo',
 };
 
+// recipeSafety.js의 safetyType -> 새 RecipeCard의 status 값 매핑
+const SAFETY_TYPE_TO_STATUS = {
+  danger: 'warning',
+  needReplacement: 'replaceable',
+  safe: 'safe',
+};
+
 function HomePage() {
   const [current, setCurrent] = useState(0);
   const navigate = useNavigate();
@@ -61,137 +72,120 @@ function HomePage() {
   const [searchValue, setSearchValue] = useState('');
   const [heroConditions, setHeroConditions] = useState({ veganTypeName: '', allergyNames: [] });
 
+  // 공통: 유저 안전조건 + 즐겨찾기 id 목록
+  const [conditions, setConditions] = useState(null);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
+
   useEffect(() => {
     if (!user) {
+      setConditions(null);
+      setFavoriteIds(new Set());
       setHeroConditions({ veganTypeName: '', allergyNames: [] });
       return;
     }
     let isActive = true;
 
-    getUserSafetyConditions(user.id).then((conditions) => {
-      if (!isActive || !conditions) return;
-      const allergyNames = conditions.allergyOptions
-        .filter((a) => conditions.allergenIds.includes(a.id))
-        .map((a) => a.name);
-      setHeroConditions({ veganTypeName: conditions.veganTypeName, allergyNames });
-    });
+    Promise.all([getUserSafetyConditions(user.id), getFavoriteRecipeIds(user.id)]).then(
+      ([conditionsResult, favIds]) => {
+        if (!isActive) return;
+        setConditions(conditionsResult);
+        setFavoriteIds(new Set(favIds));
+
+        if (conditionsResult) {
+          const allergyNames = conditionsResult.allergyOptions
+            .filter((a) => conditionsResult.allergenIds.includes(a.id))
+            .map((a) => a.name);
+          setHeroConditions({ veganTypeName: conditionsResult.veganTypeName, allergyNames });
+        }
+      },
+    );
 
     return () => {
       isActive = false;
     };
   }, [user]);
+
+  const toggleFavorite = async (recipeId) => {
+    if (!user) return;
+    const isFav = favoriteIds.has(recipeId);
+    if (isFav) {
+      await removeFavorite(user.id, recipeId);
+    } else {
+      await addFavorite(user.id, recipeId);
+    }
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (isFav) {
+        next.delete(recipeId);
+      } else {
+        next.add(recipeId);
+      }
+      return next;
+    });
+  };
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;
     navigate(`/recipes?q=${encodeURIComponent(searchValue.trim())}`);
   };
 
-  // 즐겨찾기
+  // 즐겨찾기 섹션
   const [displayedFavorites, setDisplayedFavorites] = useState([]);
+  const [favoriteCounts, setFavoriteCounts] = useState({});
 
   useEffect(() => {
-    if (!user) {
+    if (!user || favoriteIds.size === 0) {
       setDisplayedFavorites([]);
+      setFavoriteCounts({});
       return;
     }
     let isActive = true;
+    const ids = Array.from(favoriteIds);
 
-    async function loadFavorites() {
-      const recipeIds = await getFavoriteRecipeIds(user.id);
-      if (recipeIds.length === 0) {
-        if (isActive) setDisplayedFavorites([]);
-        return;
-      }
-
-      const [recipes, counts, conditions] = await Promise.all([
-        getRecipesByIds(recipeIds),
-        getFavoriteCounts(recipeIds),
-        getUserSafetyConditions(user.id),
-      ]);
-
+    Promise.all([getRecipesByIds(ids), getFavoriteCounts(ids)]).then(([recipes, counts]) => {
       if (!isActive) return;
+      setDisplayedFavorites(recipes);
+      setFavoriteCounts(counts);
+    });
 
-      setDisplayedFavorites(
-        recipes.map((recipe) => ({
-          id: recipe.id,
-          imageUrl: recipe.image_url,
-          difficulty: recipe.difficulty,
-          name: recipe.title,
-          description: recipe.description,
-          time: recipe.cooking_time,
-          serves: recipe.servings,
-          likes: counts[recipe.id] ?? 0,
-          ...getRecipeSafetyStatus(recipe, conditions),
-        })),
-      );
-    }
-
-    loadFavorites();
     return () => {
       isActive = false;
     };
-  }, [user]);
+  }, [user, favoriteIds]);
 
-  const handleUnfavorite = async (id) => {
-    if (!user) return;
-    await removeFavorite(user.id, id);
-    setDisplayedFavorites((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  // 인기 레시피
+  // 인기 레시피 섹션
   const [popularRecipes, setPopularRecipes] = useState([]);
+  const [popularCounts, setPopularCounts] = useState({});
 
   useEffect(() => {
     let isActive = true;
 
-    async function loadPopular() {
-      const recipes = await getPopularRecipes(4);
-      const counts = await getFavoriteCounts(recipes.map((r) => r.id));
-
+    getPopularRecipes(4).then(async (recipes) => {
       if (!isActive) return;
+      setPopularRecipes(recipes);
+      const counts = await getFavoriteCounts(recipes.map((r) => r.id));
+      if (!isActive) return;
+      setPopularCounts(counts);
+    });
 
-      setPopularRecipes(
-        recipes.map((recipe) => ({
-          id: recipe.id,
-          imageUrl: recipe.image_url,
-          difficulty: recipe.difficulty,
-          name: recipe.title,
-          description: recipe.description,
-          time: recipe.cooking_time,
-          serves: recipe.servings,
-          likes: counts[recipe.id] ?? 0,
-        })),
-      );
-    }
-
-    loadPopular();
     return () => {
       isActive = false;
     };
   }, []);
 
-  // 비건 유형별 추천
+  // 비건 유형별 추천 섹션
   const [activeVeganTab, setActiveVeganTab] = useState('전체');
   const [showAllVeganTabs, setShowAllVeganTabs] = useState(false);
   const [veganLoading, setVeganLoading] = useState(false);
   const [veganRecipes, setVeganRecipes] = useState([]);
+  const [veganCounts, setVeganCounts] = useState({});
 
   const loadVeganRecipes = async (tab) => {
     setVeganLoading(true);
     const recipes = await getRecipesByVeganType(VEGAN_TAB_ID_MAP[tab], 3);
+    setVeganRecipes(recipes);
     const counts = await getFavoriteCounts(recipes.map((r) => r.id));
-    setVeganRecipes(
-      recipes.map((recipe) => ({
-        id: recipe.id,
-        imageUrl: recipe.image_url,
-        difficulty: recipe.difficulty,
-        name: recipe.title,
-        description: recipe.description,
-        time: recipe.cooking_time,
-        serves: recipe.servings,
-        likes: counts[recipe.id] ?? 0,
-      })),
-    );
+    setVeganCounts(counts);
     setVeganLoading(false);
   };
 
@@ -208,6 +202,11 @@ function HomePage() {
     <div className={styles['home-page']}>
       <section className={styles['home-hero']}>
         <div className={`container ${styles['home-hero__inner']}`}>
+          <div className={styles['home-hero__badge']}>
+            <span className={styles['home-hero__badge-dot']}></span>
+            AI 기반 맞춤 레시피 서비스
+          </div>
+
           <div className={styles['home-hero__track-wrapper']}>
             <div
               className={styles['home-hero__track']}
@@ -247,6 +246,21 @@ function HomePage() {
                 aria-label={`${index + 1}번째 슬라이드`}
               ></button>
             ))}
+          </div>
+
+          <div className={styles['home-hero__stats']}>
+            <span className={styles['home-hero__stat']}>
+              <span className="material-symbols-outlined">check</span>
+              AI 성분 분석
+            </span>
+            <span className={styles['home-hero__stat']}>
+              <span className="material-symbols-outlined">check</span>
+              알레르기 조건 반영
+            </span>
+            <span className={styles['home-hero__stat']}>
+              <span className="material-symbols-outlined">check</span>
+              비건 유형 8가지
+            </span>
           </div>
 
           <div className={styles['home-hero__fixed-area']}>
@@ -301,26 +315,36 @@ function HomePage() {
 
       <section className={styles['home-process']}>
         <div className={`container ${styles['home-process__inner']}`}>
-          {STEPS.map((step, index) => (
-            <Fragment key={index}>
-              <div className={styles['home-process__step']}>
-                <div className={styles['home-process__icon-circle']}>
-                  <span className={`material-symbols-outlined ${styles['home-process__icon']}`}>
-                    {step.icon}
-                  </span>
-                </div>
-                <div className={styles['home-process__text']}>
+          <div className={styles['home-process__header']}>
+            <p className={styles['home-process__eyebrow']}>HOW IT WORKS</p>
+            <h2 className={styles['home-process__heading']}>이렇게 찾아드려요</h2>
+            <p className={styles['home-process__subheading']}>3단계로 안전한 레시피를 추천해요</p>
+          </div>
+          <div className={styles['home-process__steps']}>
+            {STEPS.map((step, index) => (
+              <Fragment key={index}>
+                <div className={styles['home-process__step']}>
+                  <div
+                    className={`${styles['home-process__icon-circle']} ${styles[`home-process__icon-circle--${index}`]}`}
+                  >
+                    <span
+                      className={`material-symbols-outlined ${styles['home-process__icon']} ${styles[`home-process__icon--${index}`]}`}
+                    >
+                      {step.icon}
+                    </span>
+                  </div>
+                  <p className={styles['home-process__step-label']}>STEP 0{index + 1}</p>
                   <p className={styles['home-process__title']}>{step.title}</p>
                   <p className={styles['home-process__desc']}>{step.desc}</p>
                 </div>
-              </div>
-              {index < STEPS.length - 1 && (
-                <span className={`material-symbols-outlined ${styles['home-process__arrow']}`}>
-                  arrow_forward
-                </span>
-              )}
-            </Fragment>
-          ))}
+                {index < STEPS.length - 1 && (
+                  <span className={`material-symbols-outlined ${styles['home-process__arrow']}`}>
+                    arrow_forward
+                  </span>
+                )}
+              </Fragment>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -331,23 +355,25 @@ function HomePage() {
             <Link to="/favorite" className={styles['home-favorites__more']}>더보기</Link>
           </div>
           <div className={styles['home-favorites__grid']}>
-            {displayedFavorites.map((recipe) => (
-              <FavoriteRecipeCard
-                key={recipe.id}
-                imageUrl={recipe.imageUrl}
-                difficulty={recipe.difficulty}
-                name={recipe.name}
-                description={recipe.description}
-                time={recipe.time}
-                serves={recipe.serves}
-                likes={recipe.likes}
-                safetyType={recipe.safetyType}
-                safetyTitle={recipe.safetyTitle}
-                safetyDesc={recipe.safetyDesc}
-                onClick={() => navigate(`/recipes/${recipe.id}`)}
-                onFavoriteClick={() => handleUnfavorite(recipe.id)}
-              />
-            ))}
+            {displayedFavorites.map((recipe) => {
+              const safety = getRecipeSafetyStatus(recipe, conditions);
+              return (
+                <RecipeCard
+                  key={recipe.id}
+                  recipeId={recipe.id}
+                  imageUrl={recipe.image_url}
+                  difficulty={recipe.difficulty}
+                  name={recipe.title}
+                  description={recipe.description}
+                  time={recipe.cooking_time}
+                  serves={recipe.servings}
+                  likes={favoriteCounts[recipe.id] ?? 0}
+                  isFavorite={true}
+                  onFavoriteClick={() => toggleFavorite(recipe.id)}
+                  status={SAFETY_TYPE_TO_STATUS[safety.safetyType]}
+                />
+              );
+            })}
           </div>
         </div>
       </section>
@@ -356,19 +382,25 @@ function HomePage() {
         <div className={`container ${styles['home-popular__inner']}`}>
           <h2 className={styles['home-popular__title']}>인기 레시피</h2>
           <div className={styles['home-popular__grid']}>
-            {popularRecipes.map((recipe) => (
-              <RecipeCard
-                key={recipe.id}
-                imageUrl={recipe.imageUrl}
-                difficulty={recipe.difficulty}
-                name={recipe.name}
-                description={recipe.description}
-                time={recipe.time}
-                serves={recipe.serves}
-                likes={recipe.likes}
-                onClick={() => navigate(`/recipes/${recipe.id}`)}
-              />
-            ))}
+            {popularRecipes.map((recipe) => {
+              const safety = getRecipeSafetyStatus(recipe, conditions);
+              return (
+                <RecipeCard
+                  key={recipe.id}
+                  recipeId={recipe.id}
+                  imageUrl={recipe.image_url}
+                  difficulty={recipe.difficulty}
+                  name={recipe.title}
+                  description={recipe.description}
+                  time={recipe.cooking_time}
+                  serves={recipe.servings}
+                  likes={popularCounts[recipe.id] ?? 0}
+                  isFavorite={favoriteIds.has(recipe.id)}
+                  onFavoriteClick={() => toggleFavorite(recipe.id)}
+                  status={SAFETY_TYPE_TO_STATUS[safety.safetyType]}
+                />
+              );
+            })}
           </div>
         </div>
       </section>
@@ -420,19 +452,25 @@ function HomePage() {
             </div>
           ) : (
             <div className={styles['home-vegan__grid']}>
-              {veganRecipes.map((recipe) => (
-                <RecipeCard
-                  key={recipe.id}
-                  imageUrl={recipe.imageUrl}
-                  difficulty={recipe.difficulty}
-                  name={recipe.name}
-                  description={recipe.description}
-                  time={recipe.time}
-                  serves={recipe.serves}
-                  likes={recipe.likes}
-                  onClick={() => navigate(`/recipes/${recipe.id}`)}
-                />
-              ))}
+              {veganRecipes.map((recipe) => {
+                const safety = getRecipeSafetyStatus(recipe, conditions);
+                return (
+                  <RecipeCard
+                    key={recipe.id}
+                    recipeId={recipe.id}
+                    imageUrl={recipe.image_url}
+                    difficulty={recipe.difficulty}
+                    name={recipe.title}
+                    description={recipe.description}
+                    time={recipe.cooking_time}
+                    serves={recipe.servings}
+                    likes={veganCounts[recipe.id] ?? 0}
+                    isFavorite={favoriteIds.has(recipe.id)}
+                    onFavoriteClick={() => toggleFavorite(recipe.id)}
+                    status={SAFETY_TYPE_TO_STATUS[safety.safetyType]}
+                  />
+                );
+              })}
             </div>
           )}
         </div>

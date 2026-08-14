@@ -146,7 +146,10 @@ export async function createRecipe(recipe, imageFile = null) {
 export async function getPopularRecipes(limit = 4) {
   const { data, error } = await supabase
     .from("recipes")
-    .select("id, title, description, image_url, servings, cooking_time, difficulty")
+    .select(`
+      id, title, description, image_url, servings, cooking_time, difficulty,
+      recipe_ingredients ( ingredients ( category_id ) )
+    `)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -174,12 +177,16 @@ export async function getRecipesByIds(recipeIds) {
   }
   return data;
 }
+
 export async function getRecipesByVeganType(veganTypeId, limit = 3) {
   // "전체" (필터 없음)
   if (!veganTypeId) {
     const { data, error } = await supabase
       .from("recipes")
-      .select("id, title, description, image_url, difficulty, cooking_time, servings")
+      .select(`
+        id, title, description, image_url, difficulty, cooking_time, servings,
+        recipe_ingredients ( ingredients ( category_id ) )
+      `)
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) {

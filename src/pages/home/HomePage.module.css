@@ -17,6 +17,27 @@
   gap: 32px;
 }
 
+.home-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: var(--white-1);
+  border: 1px solid var(--gray-1);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.home-hero__badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
 .home-hero__track-wrapper {
   overflow: hidden;
   width: 100%;
@@ -45,6 +66,9 @@
 .home-hero__title {
   color: var(--black-1);
   margin: 0;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.3;
 }
 
 .home-hero__desc {
@@ -75,6 +99,33 @@
 }
 .home-hero__dot--active {
   background: var(--primary);
+}
+
+.home-hero__stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.home-hero__stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gray-3);
+  font-size: 14px;
+}
+
+.home-hero__stat :global(.material-symbols-outlined) {
+  font-size: 16px;
+  color: var(--primary);
+}
+
+.home-hero__stats .home-hero__stat:nth-child(2) :global(.material-symbols-outlined) {
+  color: var(--warning);
+}
+.home-hero__stats .home-hero__stat:nth-child(3) :global(.material-symbols-outlined) {
+  color: var(--danger);
 }
 
 .home-hero__fixed-area {
@@ -155,6 +206,7 @@
   color: var(--white-1);
   text-align: center;
   box-sizing: border-box;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
 @media (min-width: 768px) and (max-width: 1271px) {
@@ -189,7 +241,7 @@
     gap: 12px;
   }
   .home-hero__title {
-    font-size: 30px;
+    font-size: 28px;
   }
   .home-hero__desc {
     font-size: 14px;
@@ -197,6 +249,9 @@
   .home-hero__image {
     width: 100%;
     height: 250px;
+  }
+  .home-hero__stats {
+    gap: 10px 16px;
   }
   .home-hero__fixed-area {
     gap: 12px;
@@ -223,41 +278,84 @@
 
 .home-process__inner {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   gap: 40px;
-  flex-wrap: nowrap;
+}
+
+.home-process__header {
+  text-align: center;
+}
+
+.home-process__eyebrow {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin: 0 0 8px;
+}
+
+.home-process__heading {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--black-1);
+  margin: 0 0 8px;
+}
+
+.home-process__subheading {
+  color: var(--gray-3);
+  font-size: 15px;
+  margin: 0;
+}
+
+.home-process__steps {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 24px;
 }
 
 .home-process__step {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  flex-shrink: 0;
+  text-align: center;
+  gap: 8px;
+  flex: 1;
+  padding: 32px 20px;
+  border: 1px solid var(--gray-1);
+  border-radius: 16px;
+  background: var(--white-1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .home-process__icon-circle {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: var(--secondary);
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 8px;
 }
+
+.home-process__icon-circle--0 { background: rgba(76, 175, 80, 0.12); }
+.home-process__icon-circle--1 { background: rgba(255, 152, 0, 0.12); }
+.home-process__icon-circle--2 { background: rgba(244, 67, 54, 0.12); }
 
 .home-process__icon {
   font-size: 32px;
-  color: var(--primary);
 }
 
-.home-process__text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  text-align: center;
+.home-process__icon--0 { color: var(--primary); }
+.home-process__icon--1 { color: var(--warning); }
+.home-process__icon--2 { color: var(--danger); }
+
+.home-process__step-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray-3);
+  letter-spacing: 0.05em;
+  margin: 0;
 }
 
 .home-process__title {
@@ -269,7 +367,7 @@
 }
 
 .home-process__desc {
-  font-size: 16px;
+  font-size: 14px;
   line-height: 150%;
   font-weight: 400;
   color: var(--gray-3);
@@ -277,14 +375,14 @@
 }
 
 .home-process__arrow {
-  font-size: 16px;
-  color: var(--gray-3);
+  font-size: 24px;
+  color: var(--gray-2);
+  align-self: center;
 }
 
 @media (max-width: 767px) {
-  .home-process__inner {
+  .home-process__steps {
     flex-direction: column;
-    gap: 24px;
   }
   .home-process__arrow {
     transform: rotate(90deg);

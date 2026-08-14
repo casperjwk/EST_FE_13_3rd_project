@@ -225,3 +225,12 @@
   border-color: var(--secondary);
   background-color: rgba(168, 198, 134, 0.02);
 }
+/* 카드높이조정 */
+.cardDescription {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 42px;
+  margin: 0;
+}
