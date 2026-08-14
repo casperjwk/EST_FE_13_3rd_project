@@ -98,6 +98,8 @@ function FavoritePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [cardsPerPage, setCardsPerPage] = useState(() => getCardsPerPage());
   const cardsPerPageRef = useRef(cardsPerPage);
+  const [oneLineDescriptionIds, setOneLineDescriptionIds] = useState(() => new Set());
+  const descriptionRefs = useRef(new Map());
 
   const rawPageParam = Number.parseInt(searchParams.get("page"), 10);
   const requestedPage = Number.isInteger(rawPageParam) && rawPageParam > 0 ? rawPageParam : 1;
@@ -313,6 +315,25 @@ function FavoritePage() {
     );
   }, [hasFavorites, requestedPage, safeCurrentPage, setSearchParams]);
 
+  // 카드 설명이 실제로 1줄로 끝났는지 재서, 1줄 카드만 메타<->상태표시 갭을 더 크게 줌
+  useEffect(() => {
+    const measureDescriptionLines = () => {
+      const oneLineIds = new Set();
+      descriptionRefs.current.forEach((el, id) => {
+        if (!el) return;
+        const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 0;
+        if (lineHeight > 0 && el.scrollHeight <= lineHeight * 1.5) {
+          oneLineIds.add(id);
+        }
+      });
+      setOneLineDescriptionIds(oneLineIds);
+    };
+
+    measureDescriptionLines();
+    window.addEventListener("resize", measureDescriptionLines);
+    return () => window.removeEventListener("resize", measureDescriptionLines);
+  }, [favoriteRecipes, safeCurrentPage, cardsPerPage]);
+
   return (
     <div className={styles.favoritePage}>
       <div className={`container ${styles.favoritePageInner}`}>
@@ -451,8 +472,20 @@ function FavoritePage() {
                   >
                     {recipe.name}
                   </p>
-                  <p className={styles.cardDescription}>{recipe.description}</p>
-                  <div className={styles.cardMeta}>
+                  <p
+                    className={styles.cardDescription}
+                    ref={el => {
+                      if (el) descriptionRefs.current.set(recipe.id, el);
+                      else descriptionRefs.current.delete(recipe.id);
+                    }}
+                  >
+                    {recipe.description}
+                  </p>
+                  <div
+                    className={`${styles.cardMeta} ${
+                      oneLineDescriptionIds.has(recipe.id) ? styles.cardMetaOneLine : ""
+                    }`}
+                  >
                     <span className={styles.cardMetaItem}>
                       <span className="material-icons" aria-hidden="true">
                         timer
