@@ -243,10 +243,7 @@ function MyPage() {
   }, [authUser, authLoading]);
 
   const goToRecipeDetail = id => {
-    if (recentDrag.current.moved) {
-      recentDrag.current.moved = false;
-      return;
-    }
+    if (recentDrag.current.moved) return;
     navigate(`/recipes/${id}`);
   };
 
@@ -522,10 +519,15 @@ function MyPage() {
 
   const handleRecentDragStart = event => {
     const el = recentScrollRef.current;
-    if (!el) return;
-    recentDrag.current = { isDown: true, startX: event.pageX, scrollLeft: el.scrollLeft, moved: false };
-    el.style.cursor = "grabbing";
-    el.style.userSelect = "none";
+    // 터치는 브라우저 기본 스크롤이 이미 잘 되니, 마우스 클릭+드래그일 때만 개입
+    if (!el || event.pointerType !== "mouse") return;
+    recentDrag.current = {
+      isDown: true,
+      startX: event.pageX,
+      scrollLeft: el.scrollLeft,
+      moved: false,
+      pointerId: event.pointerId,
+    };
   };
 
   const handleRecentDragMove = event => {
@@ -533,17 +535,34 @@ function MyPage() {
     const el = recentScrollRef.current;
     if (!drag.isDown || !el) return;
     const delta = event.pageX - drag.startX;
-    if (Math.abs(delta) > 3) drag.moved = true;
-    el.scrollLeft = drag.scrollLeft - delta;
+    if (!drag.moved && Math.abs(delta) > 3) {
+      drag.moved = true;
+      // 실제로 드래그라고 판단된 순간에만 포인터를 붙잡아서, 카드 영역 밖으로 나가도
+      // 드래그가 끊기지 않게 함 (처음부터 붙잡아두면 그냥 클릭까지 방해받음)
+      el.setPointerCapture(drag.pointerId);
+      el.style.cursor = "grabbing";
+      el.style.userSelect = "none";
+    }
+    if (drag.moved) {
+      el.scrollLeft = drag.scrollLeft - delta;
+    }
   };
 
-  const handleRecentDragEnd = () => {
+  const handleRecentDragEnd = event => {
     const el = recentScrollRef.current;
+    const wasDragging = recentDrag.current.moved;
     recentDrag.current.isDown = false;
     if (el) {
+      if (wasDragging && event?.pointerId != null) el.releasePointerCapture(event.pointerId);
       el.style.cursor = "";
       el.style.userSelect = "";
     }
+    // 드래그 종료 직후 뒤이어 오는 클릭(같은 제스처)만 무시하고, 그 이후의 독립적인 클릭은
+    // 정상 동작하도록 다음 틱에 리셋 (goToRecipeDetail 안에서 바로 리셋하면 카드가 아닌
+    // 곳에서 드래그가 끝났을 때 다음 클릭까지 잘못 씹히는 문제가 있었음)
+    setTimeout(() => {
+      recentDrag.current.moved = false;
+    }, 0);
   };
 
   return (
@@ -909,10 +928,10 @@ function MyPage() {
             className={styles.recentScroll}
             ref={recentScrollRef}
             onScroll={updateRecentScrollState}
-            onMouseDown={handleRecentDragStart}
-            onMouseMove={handleRecentDragMove}
-            onMouseUp={handleRecentDragEnd}
-            onMouseLeave={handleRecentDragEnd}
+            onPointerDown={handleRecentDragStart}
+            onPointerMove={handleRecentDragMove}
+            onPointerUp={handleRecentDragEnd}
+            onPointerCancel={handleRecentDragEnd}
           >
             {recentRecipes.map(recipe => {
               const isFavorite = favoriteRecipeIds.has(recipe.id);
