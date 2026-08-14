@@ -52,6 +52,34 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function describeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+    };
+  }
+
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const messageParts = [record.message, record.details, record.hint]
+      .filter(value => typeof value === "string" && value.trim())
+      .map(String);
+
+    return {
+      message: messageParts.join(" | ") || "Unknown generation error",
+      code: typeof record.code === "string" ? record.code : undefined,
+      details: record.details,
+      hint: record.hint,
+    };
+  }
+
+  return {
+    message: typeof error === "string" && error.trim() ? error : "Unknown generation error",
+  };
+}
+
 function one<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 }
@@ -217,6 +245,23 @@ DATA=${JSON.stringify(input)}`;
   throw new Error("Alan prompt is too long after URL encoding");
 }
 
+function createCorrectionPrompt(
+  originalPrompt: string,
+  restrictions: Restriction[],
+  steps: OriginalStep[],
+) {
+  const expectedIds = restrictions.map(item => item.ingredient.id);
+  const detailStepNumbers = steps
+    .filter(step => step.stepType === "detail")
+    .map(step => step.stepNumber);
+  const briefStepNumbers = steps
+    .filter(step => step.stepType === "brief")
+    .map(step => step.stepNumber);
+
+  return `${originalPrompt}
+RETRY_CORRECTION: The previous output failed validation. Return the complete JSON again. ingredients must contain exactly ${expectedIds.length} items, with each expected original_id exactly once and no other original_id. EXPECTED_ORIGINAL_IDS=${JSON.stringify(expectedIds)}. Preserve step numbers exactly: detail=${JSON.stringify(detailStepNumbers)}, brief=${JSON.stringify(briefStepNumbers)}. Use only allowed category_id values from DATA.categories. Output JSON only.`;
+}
+
 async function requestAlan(base: string, clientId: string, prompt: string) {
   const url = new URL(`${base.replace(/\/$/, "")}/question`);
   url.searchParams.set("content", prompt);
@@ -272,10 +317,14 @@ async function resetAlanState(base: string, clientId: string) {
   return true;
 }
 
-async function callAlan(prompt: string) {
+async function callAlan(prompt: string, resetBeforeRequest = false) {
   const base = Deno.env.get("ALAN_API_BASE_URL") ?? ALAN_API_DEFAULT;
   const clientId = Deno.env.get("ALAN_CLIENT_ID");
   if (!clientId) throw new Error("ALAN_CLIENT_ID is not configured");
+
+  if (resetBeforeRequest) {
+    await resetAlanState(base, clientId);
+  }
 
   let { response, responseData } = await requestAlan(base, clientId, prompt);
 
@@ -394,22 +443,48 @@ async function findCachedRecipe(
   );
 }
 
-async function findOrCreateIngredient(supabase: SupabaseClient, item: AiIngredient) {
-  const { data: found, error: findError } = await supabase
-    .from("ingredients")
-    .select("id")
-    .eq("name", item.name.trim())
-    .eq("category_id", item.category_id)
-    .limit(1);
-  if (findError) throw findError;
-  if (found?.[0]) return found[0].id as string;
+async function findOrCreateIngredient(
+  supabase: SupabaseClient,
+  item: AiIngredient,
+  forbiddenCategoryIds: Set<string>,
+) {
+  const ingredientName = item.name.trim();
+
+  const getExistingIngredient = async () => {
+    const { data, error } = await supabase
+      .from("ingredients")
+      .select("id, category_id")
+      .eq("name", ingredientName)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (
+      data?.category_id != null &&
+      forbiddenCategoryIds.has(String(data.category_id))
+    ) {
+      throw new Error("Alan selected an existing ingredient from a forbidden category");
+    }
+
+    return data;
+  };
+
+  const found = await getExistingIngredient();
+  if (found) return found.id as string;
 
   const { data, error } = await supabase
     .from("ingredients")
-    .insert({ name: item.name.trim(), category_id: item.category_id })
+    .insert({ name: ingredientName, category_id: item.category_id })
     .select("id")
     .single();
-  if (error) throw error;
+
+  if (error) {
+    if (error.code === "23505") {
+      const concurrentlyCreated = await getExistingIngredient();
+      if (concurrentlyCreated) return concurrentlyCreated.id as string;
+    }
+    throw error;
+  }
+
   return data.id as string;
 }
 
@@ -584,14 +659,31 @@ Deno.serve(async request => {
         category => !forbiddenCategoryIds.has(String(category.id)),
       ),
     });
-    const ai = await callAlan(prompt);
-    validateAiRecipe(ai, restrictions, steps, forbiddenCategoryIds);
+    let ai = await callAlan(prompt);
+
+    try {
+      validateAiRecipe(ai, restrictions, steps, forbiddenCategoryIds);
+    } catch (validationError) {
+      console.warn("Alan recipe response failed validation; retrying once", {
+        message:
+          validationError instanceof Error ? validationError.message : "Unknown validation error",
+        expectedOriginalIds: restrictions.map(item => item.ingredient.id),
+        returnedOriginalIds: ai.ingredients.map(item => item?.original_id),
+      });
+
+      const correctionPrompt = createCorrectionPrompt(prompt, restrictions, steps);
+      ai = await callAlan(correctionPrompt, true);
+      validateAiRecipe(ai, restrictions, steps, forbiddenCategoryIds);
+    }
 
     const aiByOriginalId = new Map(ai.ingredients.map(item => [item.original_id, item]));
     const restrictionByOriginalId = new Map(restrictions.map(item => [item.ingredient.id, item]));
     const replacementIds = new Map<string, string>();
     for (const item of ai.ingredients) {
-      replacementIds.set(item.original_id, await findOrCreateIngredient(supabase, item));
+      replacementIds.set(
+        item.original_id,
+        await findOrCreateIngredient(supabase, item, forbiddenCategoryIds),
+      );
     }
 
     const { data: parent, error: parentError } = await supabase
@@ -663,11 +755,13 @@ Deno.serve(async request => {
     if (savedError) throw savedError;
     return json(normalizeCustomRecipe(saved, "generated"), 201);
   } catch (error) {
-    console.error("Custom recipe generation failed", error);
+    const errorInfo = describeError(error);
+    console.error("Custom recipe generation failed", errorInfo);
     return json(
       {
         error: "CUSTOM_RECIPE_GENERATION_FAILED",
-        message: error instanceof Error ? error.message : "Unknown generation error",
+        message: errorInfo.message,
+        code: errorInfo.code,
       },
       500,
     );
