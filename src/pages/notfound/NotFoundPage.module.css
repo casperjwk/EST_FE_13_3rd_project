@@ -1,0 +1,85 @@
+.page {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--white-2);
+}
+
+.content {
+  display: flex;
+  width: min(100%, 520px);
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px;
+  border: 1px solid rgb(106 143 91 / 18%);
+  border-radius: 32px;
+  background: var(--white-1);
+  box-shadow: 0 18px 50px rgb(67 67 67 / 8%);
+  text-align: center;
+}
+
+.code {
+  margin-bottom: 12px;
+  color: var(--secondary);
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -2px;
+}
+
+.title {
+  margin: 0 0 32px;
+  color: var(--black-2);
+  font-size: 24px;
+  line-height: 1.4;
+  font-weight: 700;
+  word-break: keep-all;
+}
+
+.homeButton {
+  display: inline-flex;
+  min-width: 180px;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 24px;
+  color: var(--white-1);
+  border-radius: 10px;
+  background: var(--primary);
+  box-shadow: 0 8px 20px rgb(106 143 91 / 24%);
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.homeButton:hover {
+  color: var(--white-1);
+  background: #597d4b;
+  transform: translateY(-2px);
+}
+
+.homeButton:focus-visible {
+  outline: 3px solid rgb(168 198 134 / 55%);
+  outline-offset: 3px;
+}
+
+.homeButton span {
+  font-size: 20px;
+}
+
+@media (min-width: 768px) {
+  .content {
+    padding: 64px 48px;
+    border-radius: 40px;
+  }
+
+  .code {
+    font-size: 80px;
+  }
+
+  .title {
+    font-size: 30px;
+  }
+}

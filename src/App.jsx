@@ -28,13 +28,13 @@ function App() {
           <Route path="/recipes/:id" element={<RecipeDetailPage />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/favorite" element={<FavoritePage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
 
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/create" element={<RecipeCreatePage />} />
-        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AuthProvider>
   );
