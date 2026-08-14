@@ -84,7 +84,7 @@ function RecipeListPage() {
   };
 
   const defaultVeganTypeId =
-    filterOptions.veganOptions.find(veganType => veganType.name === "일반")?.id ?? null;
+    filterOptions.veganOptions.find((veganType) => veganType.name === "일반")?.id ?? null;
 
   useEffect(() => {
     let isActive = true;
@@ -232,13 +232,13 @@ function RecipeListPage() {
   const activeAllergenCategoryMappings =
     safetyConditions?.allergenCategoryMappings ?? filterOptions.allergenCategoryMappings;
   const activeVeganOptions =
-    safetyConditions?.veganOptions?.length > 0 ? safetyConditions.veganOptions : filterOptions.veganOptions;
+    safetyConditions?.veganOptions?.length > 0
+      ? safetyConditions.veganOptions
+      : filterOptions.veganOptions;
   const activeVeganTypeRestrictions =
     safetyConditions?.veganTypeRestrictions ?? filterOptions.veganTypeRestrictions;
-  const selectedAllergenIds = getAllergenIdsByFilterState(allergyFilters, [
-    "warning",
-    "exclude",
-  ]);
+  const selectedAllergenIds = getAllergenIdsByFilterState(allergyFilters, ["exclude"]);
+  const statusVeganTypeId = safetyConditions?.veganTypeId ?? veganFilter;
 
   const effectiveConditions = {
     allergenIds: [
@@ -246,24 +246,11 @@ function RecipeListPage() {
     ],
     allergyOptions: activeAllergyOptions,
     allergenCategoryMappings: activeAllergenCategoryMappings,
-    veganTypeId: veganFilter,
+    veganTypeId: statusVeganTypeId,
     veganTypeRestrictions: activeVeganTypeRestrictions,
   };
 
-  const filteredRecipes = recipes.filter((recipe) => {
-    if (!recipeMatchesKeyword(recipe, keyword)) return false;
-
-    if (recipe.hasAiCustomRecipe) return true;
-
-    const passesAllergyFilter =
-      filterRecipesByAllergies([recipe], allergyFilters, activeAllergenCategoryMappings).length > 0;
-    const passesVeganFilter =
-      filterRecipesByVeganType([recipe], veganFilter, activeVeganTypeRestrictions).length > 0;
-
-    return passesAllergyFilter && passesVeganFilter;
-  });
-
-  const recipesWithStatus = filteredRecipes.map((recipe) => {
+  const recipesWithStatus = recipes.map((recipe) => {
     if (recipe.hasAiCustomRecipe) {
       return {
         ...recipe,
@@ -279,8 +266,21 @@ function RecipeListPage() {
     };
   });
 
-  const visibleRecipes = recipesWithStatus.slice(0, visibleCount);
-  const hasMoreRecipes = visibleCount < recipesWithStatus.length;
+  const filteredRecipes = recipesWithStatus.filter((recipe) => {
+    if (!recipeMatchesKeyword(recipe, keyword)) return false;
+
+    if (recipe.hasAiCustomRecipe) return true;
+
+    const passesAllergyFilter =
+      filterRecipesByAllergies([recipe], allergyFilters, activeAllergenCategoryMappings).length > 0;
+    const passesVeganFilter =
+      filterRecipesByVeganType([recipe], veganFilter, activeVeganTypeRestrictions).length > 0;
+
+    return passesAllergyFilter && passesVeganFilter;
+  });
+
+  const visibleRecipes = filteredRecipes.slice(0, visibleCount);
+  const hasMoreRecipes = visibleCount < filteredRecipes.length;
 
   useEffect(() => {
     if (authLoading) return;

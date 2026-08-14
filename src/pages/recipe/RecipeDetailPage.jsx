@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import Badge from "../../components/common/Badge";
+import NotFoundPage from "../notfound/NotFoundPage";
 import { supabase } from "../../lib/supabase";
 import styles from "./RecipeDetailPage.module.css";
 import "material-icons/iconfont/filled.css";
@@ -25,6 +26,7 @@ const VEGAN_TYPE_ORDER = [
 ];
 
 const INGREDIENT_CHECK_CATEGORY_IDS = new Set(["condiments", "kimchi", "meat", "seasoning"]);
+const RECIPE_NOT_FOUND_ERROR = "recipe-not-found";
 
 function sortVeganTypes(veganTypes) {
   const orderById = new Map(VEGAN_TYPE_ORDER.map((id, index) => [id, index]));
@@ -573,12 +575,13 @@ function RecipeDetailPage() {
 
     async function loadRecipe() {
       if (!id) {
-        setRecipeError("레시피 ID가 없습니다.");
+        setRecipeError(RECIPE_NOT_FOUND_ERROR);
         setIsRecipeLoading(false);
         return;
       }
 
       setIsRecipeLoading(true);
+      setRecipe(null);
       setRecipeError("");
       try {
         const { data, error } = await supabase
@@ -614,9 +617,11 @@ function RecipeDetailPage() {
         if (!isActive) return;
         if (error) {
           console.error("[HankkiLab] Recipe detail error:", error);
-          setRecipeError("레시피를 불러오지 못했습니다.");
+          setRecipeError(
+            error.code === "22P02" ? RECIPE_NOT_FOUND_ERROR : "레시피를 불러오지 못했습니다.",
+          );
         } else if (!data) {
-          setRecipeError("존재하지 않는 레시피입니다.");
+          setRecipeError(RECIPE_NOT_FOUND_ERROR);
         } else {
           setRecipe(data);
           setAnalysisState("before");
@@ -631,7 +636,9 @@ function RecipeDetailPage() {
       } catch (error) {
         if (!isActive) return;
         console.error("[HankkiLab] Recipe detail request failed:", error);
-        setRecipeError("레시피를 불러오지 못했습니다.");
+        setRecipeError(
+          error?.code === "22P02" ? RECIPE_NOT_FOUND_ERROR : "레시피를 불러오지 못했습니다.",
+        );
       } finally {
         if (isActive) setIsRecipeLoading(false);
       }
@@ -1144,6 +1151,10 @@ function RecipeDetailPage() {
 
   if (isRecipeLoading || isUserConditionsLoading || isConditionDataLoading) {
     return <RecipeDetailSkeleton />;
+  }
+
+  if (recipeError === RECIPE_NOT_FOUND_ERROR) {
+    return <NotFoundPage />;
   }
 
   if (recipeError) {
