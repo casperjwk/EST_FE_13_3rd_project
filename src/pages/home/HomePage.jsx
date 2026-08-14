@@ -73,7 +73,6 @@ function HomePage() {
   const [conditions, setConditions] = useState(null);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
 
-  // 전체 레시피 + 전체 좋아요 수 (한 번만 불러와서 로컬에서 정렬/필터링)
   const [allRecipes, setAllRecipes] = useState([]);
   const [allCounts, setAllCounts] = useState({});
 
@@ -148,20 +147,17 @@ function HomePage() {
     navigate(`/recipes?q=${encodeURIComponent(searchValue.trim())}`);
   };
 
-  // 좋아요 많은 순 상위 4개 (allCounts 바뀔 때마다 자동 재계산)
   const popularRecipes = useMemo(
     () =>
       [...allRecipes].sort((a, b) => (allCounts[b.id] ?? 0) - (allCounts[a.id] ?? 0)).slice(0, 4),
     [allRecipes, allCounts],
   );
 
-  // 즐겨찾기한 레시피 (favoriteIds 바뀔 때마다 자동 재계산)
   const displayedFavorites = useMemo(
     () => allRecipes.filter((recipe) => favoriteIds.has(recipe.id)),
     [allRecipes, favoriteIds],
   );
 
-  // 비건 유형별 추천 섹션 (탭별로 서버에서 다시 필터링)
   const [activeVeganTab, setActiveVeganTab] = useState('전체');
   const [showAllVeganTabs, setShowAllVeganTabs] = useState(false);
   const [veganLoading, setVeganLoading] = useState(false);
@@ -221,6 +217,14 @@ function HomePage() {
           </div>
 
           <div className={styles['home-hero__dots']}>
+            <button
+              className={styles['home-hero__nav-btn']}
+              onClick={() => setCurrent((prev) => (prev - 1 + SLIDES.length) % SLIDES.length)}
+              aria-label="이전 슬라이드"
+            >
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+
             {SLIDES.map((_, index) => (
               <button
                 key={index}
@@ -231,6 +235,14 @@ function HomePage() {
                 aria-label={`${index + 1}번째 슬라이드`}
               ></button>
             ))}
+
+            <button
+              className={styles['home-hero__nav-btn']}
+              onClick={() => setCurrent((prev) => (prev + 1) % SLIDES.length)}
+              aria-label="다음 슬라이드"
+            >
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
           </div>
 
           <div className={styles['home-hero__stats']}>
