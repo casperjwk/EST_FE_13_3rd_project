@@ -114,9 +114,6 @@ function FilterPanel({
           <section className={styles.filterSection}>
             <div className={styles.sectionTitle}>
               <p className={`${styles.sectionTitleP} text-l`}>알레르기 분류</p>
-              <span className={`${styles.sectionSpan} text-xs`}>
-                선택한 알레르기 분류는 레시피 목록에서 제외됩니다
-              </span>
             </div>
             <div className={styles.chipList}>
               {sortedAllergyOptions.map((allergy) => {
