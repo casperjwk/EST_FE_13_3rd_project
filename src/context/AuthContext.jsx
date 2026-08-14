@@ -1,14 +1,31 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null); // 🟢 프로필 상태 추가
   const [loading, setLoading] = useState(true);
 
+  // 🟢 프로필 정보를 Supabase에서 가져오는 함수 (외부에서도 호출 가능)
+  const fetchProfile = useCallback(async userId => {
+    try {
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
+
+      if (error) {
+        console.error("프로필 조회 오류:", error);
+        setProfile(null);
+      } else {
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error("프로필 조회 중 예외 발생:", err);
+      setProfile(null);
+    }
+  }, []);
+
   useEffect(() => {
-    // 1. 초기 세션 및 로컬 스토리지 동기화 확인
     const checkSession = async () => {
       try {
         const {
@@ -19,6 +36,7 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           localStorage.setItem("userEmail", session.user.email);
           localStorage.setItem("isLoggedIn", "true");
+          await fetchProfile(session.user.id); // 🟢 로그인 시 프로필 함께 로드
         } else {
           const savedEmail = localStorage.getItem("userEmail");
           if (savedEmail) {
@@ -34,16 +52,18 @@ export const AuthProvider = ({ children }) => {
 
     checkSession();
 
-    // 2. Supabase 인증 상태 변경 감지 (로그인/로그아웃 실시간 반영)
+    // 인증 상태 변경 감지
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session && session.user) {
         setUser(session.user);
         localStorage.setItem("userEmail", session.user.email);
         localStorage.setItem("isLoggedIn", "true");
+        await fetchProfile(session.user.id); // 🟢 상태 변경 시 프로필 로드
       } else {
         setUser(null);
+        setProfile(null); // 🟢 로그아웃 시 프로필 초기화
         localStorage.removeItem("userEmail");
         localStorage.removeItem("isLoggedIn");
       }
@@ -53,20 +73,26 @@ export const AuthProvider = ({ children }) => {
     return () => {
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile]);
 
   // 로그아웃 함수
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setProfile(null);
     localStorage.removeItem("userEmail");
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("keepLoggedIn");
     window.location.href = "/login";
   };
 
-  return <AuthContext.Provider value={{ user, loading, signOut }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{ user, profile, refreshProfile: () => user && fetchProfile(user.id), loading, signOut }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-// 다른 컴포넌트에서 쉽게 쓸 수 있도록 커스텀 훅 제공
 export const useAuth = () => useContext(AuthContext);
