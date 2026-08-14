@@ -1,6 +1,9 @@
 .filterPanel {
   width: 100%;
   background: var(--white-2);
+  display: flex;
+  gap: 16px;
+  flex-direction: column;
 }
 
 .filterBox {
@@ -84,6 +87,10 @@
 .filterContent.closed {
   grid-template-rows: 0fr;
   opacity: 0;
+  visibility: hidden;
+}
+.filterContent.closed .filterBox {
+  padding: 0 16px;
 }
 
 .selectedFilterList {
