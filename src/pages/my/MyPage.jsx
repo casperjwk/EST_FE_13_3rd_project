@@ -60,7 +60,7 @@ const difficultyLabels = {
 
 function MyPage() {
   const navigate = useNavigate();
-  const { user: authUser, loading: authLoading } = useAuth();
+  const { user: authUser, loading: authLoading, refreshProfile } = useAuth();
   const [photoUrl, setPhotoUrl] = useState(null);
   const [allergyOptions, setAllergyOptions] = useState([]);
   const [selectedAllergies, setSelectedAllergies] = useState([]);
@@ -320,11 +320,6 @@ function MyPage() {
     );
   };
 
-  // 마이페이지에서 프로필 사진/닉네임을 바꾸면 헤더도 새로고침 없이 반영할 수 있도록 알림
-  const notifyProfileUpdated = () => {
-    window.dispatchEvent(new Event("profile-updated"));
-  };
-
   const handlePhotoChange = async event => {
     const file = event.target.files[0];
     event.target.value = "";
@@ -352,7 +347,8 @@ function MyPage() {
       if (updateError) throw updateError;
 
       setPhotoUrl(freshUrl);
-      notifyProfileUpdated();
+      refreshProfile();
+      window.dispatchEvent(new Event("profile-updated"));
     } catch (error) {
       console.error("[MyPage] 프로필 사진 업로드 실패", error);
       alert("프로필 사진을 업로드하지 못했습니다. 다시 시도해주세요.");
@@ -383,7 +379,8 @@ function MyPage() {
       if (error) throw error;
 
       setPhotoUrl(null);
-      notifyProfileUpdated();
+      refreshProfile();
+      window.dispatchEvent(new Event("profile-updated"));
     } catch (error) {
       console.error("[MyPage] 프로필 사진 삭제 실패", error);
       alert("프로필 사진을 삭제하지 못했습니다. 다시 시도해주세요.");
@@ -424,7 +421,8 @@ function MyPage() {
       if (error) throw error;
 
       setNickname(trimmed);
-      notifyProfileUpdated();
+      refreshProfile();
+      window.dispatchEvent(new Event("profile-updated"));
       setNicknameJustSaved(true);
       setTimeout(() => {
         setIsEditingNickname(false);
