@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { getFavoriteCounts } from "./favoriteService";
 
 const RECIPE_IMAGE_BUCKET = "recipe-images";
 
@@ -144,20 +145,25 @@ export async function createRecipe(recipe, imageFile = null) {
 }
 
 export async function getPopularRecipes(limit = 4) {
-  const { data, error } = await supabase
+  const { data: recipes, error } = await supabase
     .from("recipes")
     .select(`
       id, title, description, image_url, servings, cooking_time, difficulty,
       recipe_ingredients ( ingredients ( category_id ) )
-    `)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    `);
 
   if (error) {
     console.error("[HankkiLab] getPopularRecipes error:", error);
     return [];
   }
-  return data;
+  if (!recipes || recipes.length === 0) return [];
+
+  const counts = await getFavoriteCounts(recipes.map(r => r.id));
+
+  return recipes
+    .slice()
+    .sort((a, b) => (counts[b.id] ?? 0) - (counts[a.id] ?? 0))
+    .slice(0, limit);
 }
 
 export async function getRecipesByIds(recipeIds) {
@@ -218,9 +224,10 @@ export async function getRecipesByVeganType(veganTypeId, limit = 3) {
   }
 
   const compatible = (recipes ?? []).filter(recipe => {
-    const categoryIds = (recipe.recipe_ingredients ?? []).map(ri =>
-      String(ri.ingredients.category_id),
-    );
+    const categoryIds = (recipe.recipe_ingredients ?? []).map(ri => {
+      const ingredient = Array.isArray(ri.ingredients) ? ri.ingredients[0] : ri.ingredients;
+      return String(ingredient?.category_id);
+    });
     return !categoryIds.some(id => restrictedCategoryIds.includes(id));
   });
 

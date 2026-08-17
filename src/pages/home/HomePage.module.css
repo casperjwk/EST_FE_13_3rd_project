@@ -86,7 +86,8 @@
 
 .home-hero__dots {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
 }
 
 .home-hero__dot {
@@ -99,6 +100,23 @@
 }
 .home-hero__dot--active {
   background: var(--primary);
+}
+
+.home-hero__nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--gray-1);
+  background: var(--white-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--black-1);
+  flex-shrink: 0;
+}
+
+.home-hero__nav-btn :global(.material-symbols-outlined) {
+  font-size: 18px;
 }
 
 .home-hero__stats {
