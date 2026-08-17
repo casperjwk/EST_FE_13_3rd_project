@@ -348,7 +348,6 @@ function MyPage() {
 
       setPhotoUrl(freshUrl);
       refreshProfile();
-      window.dispatchEvent(new Event("profile-updated"));
     } catch (error) {
       console.error("[MyPage] 프로필 사진 업로드 실패", error);
       alert("프로필 사진을 업로드하지 못했습니다. 다시 시도해주세요.");
@@ -380,7 +379,6 @@ function MyPage() {
 
       setPhotoUrl(null);
       refreshProfile();
-      window.dispatchEvent(new Event("profile-updated"));
     } catch (error) {
       console.error("[MyPage] 프로필 사진 삭제 실패", error);
       alert("프로필 사진을 삭제하지 못했습니다. 다시 시도해주세요.");
@@ -422,7 +420,6 @@ function MyPage() {
 
       setNickname(trimmed);
       refreshProfile();
-      window.dispatchEvent(new Event("profile-updated"));
       setNicknameJustSaved(true);
       setTimeout(() => {
         setIsEditingNickname(false);
