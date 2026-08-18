@@ -175,6 +175,30 @@ function isCorrectableAlanOutputError(error: unknown) {
   ].some(message => error.message.includes(message));
 }
 
+// 대체재 개수가 맞으면 요청 순서를 기준으로 원본 재료 ID를 확실하게 다시 연결합니다.
+function alignReplacementOriginalIds(ai: AiRecipe, restricted: Restriction[]) {
+  if (ai.ingredients.length !== restricted.length) {
+    throw new Error("Alan must return exactly one replacement for every restricted ingredient");
+  }
+
+  const expectedIds = restricted.map(item => item.ingredient.id);
+  const returnedIds = ai.ingredients.map(item => String(item?.original_id ?? ""));
+
+  if (!sameIds(returnedIds, expectedIds)) {
+    console.warn("Alan returned mismatched original ingredient IDs; aligning them by request order", {
+      expectedOriginalIds: expectedIds,
+      returnedOriginalIds: returnedIds,
+    });
+
+    ai.ingredients = ai.ingredients.map((item, index) => ({
+      ...item,
+      original_id: expectedIds[index],
+    }));
+  }
+
+  return ai;
+}
+
 // 생성된 레시피가 대체 재료와 조리 단계 규칙을 모두 지켰는지 검증합니다.
 function validateAiRecipe(
   ai: AiRecipe,
@@ -272,7 +296,7 @@ function createPrompt(args: {
       ),
     };
 
-    const prompt = `Adapt this recipe. Output valid JSON only; write user-facing text in Korean. Replace every item in r.replace, avoid u.allergy and obey u.vegan. Choose category_id from categories and output only replacements. Before rewriting, compare each replacement with the original ingredient's role, moisture, texture, fat, browning, flavor and cooking speed. Where these differ, change preparation, cut size, heat, time, oil or liquid, seasoning and insertion order as needed so the dish cooks correctly; do not merely swap ingredient names. If the same method is genuinely suitable, keep it. Preserve unaffected instructions as closely as possible. Keep the same detail step count, order and numbers. Create brief steps using exactly r.brief_numbers. Each brief step must be one complete practical Korean sentence containing enough ingredient, action, heat and time information to cook from. Do not output fragments or overly short summaries.
+    const prompt = `Adapt this recipe. Output valid JSON only; write user-facing text in Korean. Replace every item in r.replace, avoid u.allergy and obey u.vegan. Return ingredients in exactly the same order as r.replace, one output item for each input item, and copy each r.replace id unchanged into original_id. Choose category_id from categories and output only replacements. Before rewriting, compare each replacement with the original ingredient's role, moisture, texture, fat, browning, flavor and cooking speed. Where these differ, change preparation, cut size, heat, time, oil or liquid, seasoning and insertion order as needed so the dish cooks correctly; do not merely swap ingredient names. If the same method is genuinely suitable, keep it. Preserve unaffected instructions as closely as possible. Keep the same detail step count, order and numbers. Create brief steps using exactly r.brief_numbers. Each brief step must be one complete practical Korean sentence containing enough ingredient, action, heat and time information to cook from. Do not output fragments or overly short summaries.
 JSON={"title":"","description":"","servings":null,"cooking_time":null,"ingredients":[{"original_id":"","name":"","amount":"","category_id":""}],"detail_steps":[{"step_number":1,"description":""}],"brief_steps":[{"step_number":1,"description":""}]}
 DATA=${JSON.stringify(input)}`;
 
@@ -760,7 +784,7 @@ Deno.serve(async request => {
     });
     let ai: AiRecipe | null = null;
     try {
-      ai = await callAlan(prompt);
+      ai = alignReplacementOriginalIds(await callAlan(prompt), restrictions);
       validateAiRecipe(ai, restrictions, steps, forbiddenCategoryIds);
     } catch (outputError) {
       if (!isCorrectableAlanOutputError(outputError)) throw outputError;
@@ -773,7 +797,7 @@ Deno.serve(async request => {
       });
 
       const correctionPrompt = createCorrectionPrompt(prompt, restrictions, steps);
-      ai = await callAlan(correctionPrompt, true);
+      ai = alignReplacementOriginalIds(await callAlan(correctionPrompt, true), restrictions);
       validateAiRecipe(ai, restrictions, steps, forbiddenCategoryIds);
     }
 
