@@ -1,8 +1,8 @@
 import { supabase } from "../lib/supabase";
 
-async function requestCustomRecipe(recipeId, cacheOnly) {
+async function requestCustomRecipe(recipeId, cacheOnly, conditions) {
   const { data, error } = await supabase.functions.invoke("generate-custom-recipe", {
-    body: { recipeId, cacheOnly },
+    body: { recipeId, cacheOnly, conditions },
   });
 
   if (error) {
@@ -24,12 +24,12 @@ async function requestCustomRecipe(recipeId, cacheOnly) {
   return data;
 }
 
-export function generateCustomRecipe(recipeId) {
-  return requestCustomRecipe(recipeId, false);
+export function generateCustomRecipe(recipeId, conditions) {
+  return requestCustomRecipe(recipeId, false, conditions);
 }
 
-export function getCachedCustomRecipe(recipeId) {
-  return requestCustomRecipe(recipeId, true);
+export function getCachedCustomRecipe(recipeId, conditions) {
+  return requestCustomRecipe(recipeId, true, conditions);
 }
 
 function sameIds(a, b) {
