@@ -98,6 +98,7 @@ function FavoritePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [cardsPerPage, setCardsPerPage] = useState(() => getCardsPerPage());
   const cardsPerPageRef = useRef(cardsPerPage);
+  const resetToFirstPageRef = useRef(false);
   const [oneLineDescriptionIds, setOneLineDescriptionIds] = useState(() => new Set());
   const descriptionRefs = useRef(new Map());
 
@@ -124,20 +125,16 @@ function FavoritePage() {
     const updateCardsPerPage = () => {
       const next = getCardsPerPage();
       if (next !== cardsPerPageRef.current) {
+        // 실제 URL 갱신은 아래의 페이지 보정 effect가 전담 - 여기서 직접 setSearchParams를
+        // 호출하면 두 effect가 같은 값을 동시에 써서 경쟁하다가(레이스 컨디션) 의도와 다르게
+        // 마지막 페이지로 남는 문제가 있었음
+        resetToFirstPageRef.current = true;
         setCardsPerPage(next);
-        setSearchParams(
-          prev => {
-            const nextParams = new URLSearchParams(prev);
-            nextParams.delete("page");
-            return nextParams;
-          },
-          { replace: true },
-        );
       }
     };
     window.addEventListener("resize", updateCardsPerPage);
     return () => window.removeEventListener("resize", updateCardsPerPage);
-  }, [setSearchParams]);
+  }, []);
 
   useEffect(() => {
     if (authLoading || authUser) {
@@ -300,7 +297,24 @@ function FavoritePage() {
 
   // 주소창에 존재하지 않는 페이지 번호(범위 초과/음수/문자 등)가 들어오면 실제로 보여준 페이지로 주소를 바로잡음
   useEffect(() => {
-    if (!hasFavorites || requestedPage === safeCurrentPage) return;
+    if (!hasFavorites) return;
+
+    if (resetToFirstPageRef.current) {
+      resetToFirstPageRef.current = false;
+      if (requestedPage !== 1) {
+        setSearchParams(
+          prev => {
+            const next = new URLSearchParams(prev);
+            next.delete("page");
+            return next;
+          },
+          { replace: true },
+        );
+      }
+      return;
+    }
+
+    if (requestedPage === safeCurrentPage) return;
     setSearchParams(
       prev => {
         const next = new URLSearchParams(prev);
@@ -313,7 +327,7 @@ function FavoritePage() {
       },
       { replace: true },
     );
-  }, [hasFavorites, requestedPage, safeCurrentPage, setSearchParams]);
+  }, [hasFavorites, requestedPage, safeCurrentPage, cardsPerPage, setSearchParams]);
 
   // 카드 설명이 실제로 1줄로 끝났는지 재서, 1줄 카드만 메타<->상태표시 갭을 더 크게 줌
   useEffect(() => {
