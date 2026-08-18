@@ -159,7 +159,23 @@ function parseAiRecipe(text: string): AiRecipe {
   return value as AiRecipe;
 }
 
-// 생성된 레시피가 대체 재료와 조리 단계 규칙을 모두 지켰는지 검증
+// JSON 파싱이나 생성 결과 검증처럼 보정 프롬프트로 다시 요청할 수 있는 오류인지 확인합니다.
+function isCorrectableAlanOutputError(error: unknown) {
+  if (error instanceof SyntaxError) return true;
+  if (!(error instanceof Error)) return false;
+
+  return [
+    "Alan response has no answer or content",
+    "Alan response does not contain JSON",
+    "Alan response has an invalid recipe shape",
+    "Alan must return exactly one replacement for every restricted ingredient",
+    "Alan returned an invalid replacement ingredient",
+    "Alan returned a replacement from a forbidden category",
+    "Alan must preserve every",
+  ].some(message => error.message.includes(message));
+}
+
+// 생성된 레시피가 대체 재료와 조리 단계 규칙을 모두 지켰는지 검증합니다.
 function validateAiRecipe(
   ai: AiRecipe,
   restricted: Restriction[],
@@ -384,7 +400,16 @@ async function callAlan(prompt: string, resetBeforeRequest = false) {
 
   const answer = extractAlanAnswer(responseData);
   if (!answer) throw new Error("Alan response has no answer or content");
-  return parseAiRecipe(answer);
+
+  try {
+    return parseAiRecipe(answer);
+  } catch (error) {
+    console.warn("Alan response parsing failed", {
+      error: describeError(error),
+      responseData,
+    });
+    throw error;
+  }
 }
 
 // 맞춤 레시피 조회 및 저장 데이터 처리
@@ -733,22 +758,26 @@ Deno.serve(async request => {
         category => !forbiddenCategoryIds.has(String(category.id)),
       ),
     });
-    let ai = await callAlan(prompt);
-
+    let ai: AiRecipe | null = null;
     try {
+      ai = await callAlan(prompt);
       validateAiRecipe(ai, restrictions, steps, forbiddenCategoryIds);
-    } catch (validationError) {
-      console.warn("Alan recipe response failed validation; retrying once", {
+    } catch (outputError) {
+      if (!isCorrectableAlanOutputError(outputError)) throw outputError;
+
+      console.warn("Alan recipe response was invalid; resetting state and retrying once", {
         message:
-          validationError instanceof Error ? validationError.message : "Unknown validation error",
+          outputError instanceof Error ? outputError.message : "Unknown Alan output error",
         expectedOriginalIds: restrictions.map(item => item.ingredient.id),
-        returnedOriginalIds: ai.ingredients.map(item => item?.original_id),
+        returnedOriginalIds: ai?.ingredients.map(item => item?.original_id) ?? [],
       });
 
       const correctionPrompt = createCorrectionPrompt(prompt, restrictions, steps);
       ai = await callAlan(correctionPrompt, true);
       validateAiRecipe(ai, restrictions, steps, forbiddenCategoryIds);
     }
+
+    if (!ai) throw new Error("Alan did not return a custom recipe");
 
     const aiByOriginalId = new Map(ai.ingredients.map(item => [item.original_id, item]));
     const restrictionByOriginalId = new Map(restrictions.map(item => [item.ingredient.id, item]));
