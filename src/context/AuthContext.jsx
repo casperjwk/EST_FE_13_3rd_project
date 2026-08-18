@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }) => {
     };
   }, [fetchProfile]);
 
-  // 로그아웃 함수
+  // 로그아웃 함수 (현재 페이지에 머무르도록 window.location.href 제거)
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -83,7 +83,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("userEmail");
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("keepLoggedIn");
-    window.location.href = "/login";
   };
 
   return (
