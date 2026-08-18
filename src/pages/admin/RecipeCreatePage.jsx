@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { createRecipe, getFoodCategories } from "../../services/recipeService";
 import { getAdminAccessStatus } from "../../services/adminAccess";
 import "./RecipeCreatePage.css";
@@ -61,6 +62,35 @@ const emptyIngredient = id => ({
 });
 const emptyStep = id => ({ id, description: "" });
 
+// Supabase 및 네트워크 오류를 사용자에게 보여 줄 한글 메시지로 변환합니다.
+function getRecipeCreateErrorMessage(error) {
+  const message = typeof error?.message === "string" ? error.message.toLowerCase() : "";
+
+  if (message.includes("row-level security") || message.includes("permission denied")) {
+    return "레시피를 등록할 권한이 없습니다. 관리자 계정을 확인해 주세요.";
+  }
+  if (message.includes("duplicate key") || error?.code === "23505") {
+    return "이미 등록된 정보와 중복되는 항목이 있습니다.";
+  }
+  if (message.includes("not-null") || message.includes("null value") || error?.code === "23502") {
+    return "필수 입력 항목을 모두 입력해 주세요.";
+  }
+  if (message.includes("invalid input syntax") || error?.code === "22P02") {
+    return "입력값의 형식이 올바르지 않습니다.";
+  }
+  if (message.includes("failed to fetch") || message.includes("network")) {
+    return "서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (message.includes("jwt") || message.includes("unauthorized")) {
+    return "로그인 정보가 만료되었습니다. 다시 로그인해 주세요.";
+  }
+  if (message.includes("image") || message.includes("storage") || message.includes("bucket")) {
+    return "이미지를 업로드하지 못했습니다. 파일을 확인해 주세요.";
+  }
+
+  return "레시피 등록에 실패했습니다. 입력 내용을 확인한 후 다시 시도해 주세요.";
+}
+
 function PlusIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -78,6 +108,7 @@ function DeleteIcon() {
 }
 
 export default function RecipeCreatePage() {
+  const navigate = useNavigate();
   const nextIngredientId = useRef(2);
   const nextStepId = useRef(3);
   const imageInputRef = useRef(null);
@@ -149,6 +180,15 @@ export default function RecipeCreatePage() {
     toastTimerRef.current = setTimeout(() => setToast(""), 2800);
   };
 
+  // 지정한 입력 요소가 보이도록 스크롤한 뒤 포커스를 이동합니다.
+  const focusInvalidField = selector => {
+    window.requestAnimationFrame(() => {
+      const field = document.querySelector(selector);
+      field?.scrollIntoView({ behavior: "smooth", block: "center" });
+      field?.focus({ preventScroll: true });
+    });
+  };
+
   const handleImageChange = event => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -176,26 +216,6 @@ export default function RecipeCreatePage() {
     );
   };
 
-  const resetForm = () => {
-    nextIngredientId.current = 2;
-    nextStepId.current = 3;
-    setTitle("");
-    setDescription("");
-    setImageFile(null);
-    setImagePreview("");
-    setIngredients([emptyIngredient(1)]);
-    setDetailSteps([emptyStep(1)]);
-    setSimpleSteps([emptyStep(2)]);
-    setServings("");
-    setCookTime("");
-    setDifficulty(null);
-    setOpenCategoryId(null);
-
-    if (imageInputRef.current) {
-      imageInputRef.current.value = "";
-    }
-  };
-
   const submitRecipe = async event => {
     event.preventDefault();
     if (isSubmitting) return;
@@ -203,6 +223,59 @@ export default function RecipeCreatePage() {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       showToast("레시피 제목을 입력해 주세요.");
+      focusInvalidField("#recipe-title");
+      return;
+    }
+
+    if (ingredients.length === 0) {
+      const ingredientId = nextIngredientId.current++;
+      setIngredients([emptyIngredient(ingredientId)]);
+      showToast("재료를 한 개 이상 입력해 주세요.");
+      focusInvalidField(`[data-ingredient-name="${ingredientId}"]`);
+      return;
+    }
+
+    const firstEmptyIngredientName = ingredients.find(ingredient => !ingredient.name.trim());
+    if (firstEmptyIngredientName) {
+      showToast("재료명을 입력해 주세요.");
+      focusInvalidField(`[data-ingredient-name="${firstEmptyIngredientName.id}"]`);
+      return;
+    }
+
+    const firstEmptyIngredientCategory = ingredients.find(ingredient => !ingredient.categoryKey);
+    if (firstEmptyIngredientCategory) {
+      showToast("재료 카테고리를 선택해 주세요.");
+      focusInvalidField(`[data-ingredient-category="${firstEmptyIngredientCategory.id}"]`);
+      return;
+    }
+
+    if (detailSteps.length === 0) {
+      const stepId = nextStepId.current++;
+      setDetailSteps([emptyStep(stepId)]);
+      showToast("상세 조리순서를 한 단계 이상 입력해 주세요.");
+      focusInvalidField(`[data-detail-step="${stepId}"]`);
+      return;
+    }
+
+    const firstEmptyDetailStep = detailSteps.find(step => !step.description.trim());
+    if (firstEmptyDetailStep) {
+      showToast("상세 조리순서를 입력해 주세요.");
+      focusInvalidField(`[data-detail-step="${firstEmptyDetailStep.id}"]`);
+      return;
+    }
+
+    if (simpleSteps.length === 0) {
+      const stepId = nextStepId.current++;
+      setSimpleSteps([emptyStep(stepId)]);
+      showToast("간단 조리순서를 한 단계 이상 입력해 주세요.");
+      focusInvalidField(`[data-simple-step="${stepId}"]`);
+      return;
+    }
+
+    const firstEmptySimpleStep = simpleSteps.find(step => !step.description.trim());
+    if (firstEmptySimpleStep) {
+      showToast("간단 조리순서를 입력해 주세요.");
+      focusInvalidField(`[data-simple-step="${firstEmptySimpleStep.id}"]`);
       return;
     }
 
@@ -232,11 +305,10 @@ export default function RecipeCreatePage() {
     try {
       setIsSubmitting(true);
       await createRecipe(payload, imageFile);
-      resetForm();
-      showToast("레시피가 등록되었습니다.");
+      navigate("/admin", { replace: true });
     } catch (error) {
       console.error("[HankkiLab] Recipe creation error:", error);
-      showToast(error.message || "레시피 등록에 실패했습니다.");
+      showToast(getRecipeCreateErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -250,6 +322,8 @@ export default function RecipeCreatePage() {
           <div className="recipe-create-step-body">
             <textarea
               className={simple ? "short" : ""}
+              data-detail-step={simple ? undefined : step.id}
+              data-simple-step={simple ? step.id : undefined}
               value={step.description}
               onChange={event => updateStep(setter, step.id, event.target.value)}
               placeholder={simple ? "간단 조리 단계를 입력하세요" : "상세 조리 단계를 입력하세요"}
@@ -377,6 +451,7 @@ export default function RecipeCreatePage() {
               <div className="recipe-create-ingredient-row" key={ingredient.id}>
                 <input
                   className="ingredient-name"
+                  data-ingredient-name={ingredient.id}
                   type="text"
                   value={ingredient.name}
                   onChange={event => updateIngredient(ingredient.id, { name: event.target.value })}
@@ -388,6 +463,7 @@ export default function RecipeCreatePage() {
                 >
                   <button
                     type="button"
+                    data-ingredient-category={ingredient.id}
                     className={`recipe-create-category-button${ingredient.categoryKey ? " selected" : ""}${openCategoryId === ingredient.id ? " open" : ""}`}
                     onClick={() =>
                       setOpenCategoryId(id => (id === ingredient.id ? null : ingredient.id))
