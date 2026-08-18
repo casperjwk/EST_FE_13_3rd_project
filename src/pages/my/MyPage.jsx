@@ -82,13 +82,14 @@ function MyPage() {
   const [isEditingDiet, setIsEditingDiet] = useState(false);
   const [isSavingDiet, setIsSavingDiet] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    if (authLoading || authUser || isWithdrawing || showWithdrawToast) {
+    if (authLoading || authUser || isWithdrawing || showWithdrawToast || isLoggingOut) {
       return;
     }
     navigate("/login");
-  }, [authUser, authLoading, isWithdrawing, showWithdrawToast, navigate]);
+  }, [authUser, authLoading, isWithdrawing, showWithdrawToast, isLoggingOut, navigate]);
 
   useEffect(() => {
     if (authLoading) {
@@ -248,6 +249,7 @@ function MyPage() {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     await supabase.auth.signOut();
     navigate("/");
   };
