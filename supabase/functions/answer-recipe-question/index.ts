@@ -48,6 +48,9 @@ type RecipeContext = {
 const ALAN_URL_LIMIT = 7500;
 const PROMPT_LIMIT = 6500;
 
+// HTTP 응답 및 응답값 검증 유틸리티
+
+// 전달받은 데이터를 CORS 헤더가 포함된 JSON 응답으로 변환
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -58,12 +61,14 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// Alan 응답이 실제 답변이 아닌 단순 완료 문구인지 확인
 function isPlaceholderAnswer(value: string) {
   const normalized = value.trim().toLowerCase().replace(/[.!]/g, "");
 
   return ["ok", "okay", "success", "accepted", "complete", "completed"].includes(normalized);
 }
 
+// 유효한 답변 문자열로 정규화
 function getString(value: unknown) {
   if (typeof value !== "string") return null;
 
@@ -76,6 +81,7 @@ function getString(value: unknown) {
   return normalized;
 }
 
+// 여러 형태로 반환될 수 있는 Alan 응답에서 실제 답변 문자열을 추출
 function extractAlanText(data: unknown) {
   const plainText = getString(data);
 
@@ -139,6 +145,9 @@ function extractAlanText(data: unknown) {
   return null;
 }
 
+// 레시피 데이터 요약 유틸리티
+
+// 문자열의 공백을 정리하고 지정한 최대 길이에 맞게 줄이기
 function shorten(value: string | null | undefined, limit: number) {
   const normalized = value?.replace(/\s+/g, " ").trim() ?? "";
 
@@ -149,6 +158,7 @@ function shorten(value: string | null | undefined, limit: number) {
   return `${normalized.slice(0, limit)}…`;
 }
 
+// 레시피 정보를 Alan 프롬프트에 넣기 좋은 간결한 텍스트로 변환
 function createCompactRecipe(recipe: RecipeContext) {
   const ingredients = (recipe.recipe_ingredients ?? [])
     .slice()
@@ -193,6 +203,9 @@ function createCompactRecipe(recipe: RecipeContext) {
   ].join("\n");
 }
 
+// Alan 프롬프트 생성 및 길이 관리
+
+// 레시피, 사용자 식이 조건 및 이전 대화를 포함한 기본 질문 프롬프트 생성
 function createQuestionPrompt(
   recipe: RecipeContext,
   dietaryContext: DietaryContext,
@@ -247,6 +260,7 @@ Write the actual Korean answer now:
 `.trim();
 }
 
+// 첫 응답이 유효하지 않을 때 사용할 간소화된 재요청 프롬프트 생성
 function createRetryPrompt(
   recipe: RecipeContext,
   dietaryContext: DietaryContext,
@@ -281,10 +295,12 @@ Korean answer:
 `.trim();
 }
 
+// URL 인코딩 후 프롬프트가 차지하는 실제 문자열 길이 계산
 function encodedPromptLength(prompt: string) {
   return encodeURIComponent(prompt).length;
 }
 
+// 길이 제한을 넘지 않는 범위에서 최신 대화부터 프롬프트에 포함
 function createPromptWithinLimit(
   recipe: RecipeContext,
   dietaryContext: DietaryContext,
@@ -316,6 +332,9 @@ function createPromptWithinLimit(
   return prompt;
 }
 
+// Alan API 통신 및 응답 재시도
+
+// 환경 변수와 프롬프트를 사용해 Alan 질문 API를 한 번 호출
 async function callAlan(prompt: string) {
   const apiBaseUrl =
     Deno.env.get("ALAN_API_BASE_URL") ?? "https://kdt-api-function.azurewebsites.net/api/v1";
@@ -365,6 +384,7 @@ async function callAlan(prompt: string) {
   return responseData;
 }
 
+// Alan 응답을 검증하고 비어 있거나 단순 완료 문구면 재요청
 async function requestAlanAnswer(prompt: string, retryPrompt: string) {
   const firstResponse = await callAlan(prompt);
   const firstAnswer = extractAlanText(firstResponse);
@@ -387,6 +407,9 @@ async function requestAlanAnswer(prompt: string, retryPrompt: string) {
   return retryAnswer.replace(/\*\*/g, "");
 }
 
+// Edge Function 요청 처리
+
+// 요청 검증부터 사용자·레시피 조회와 Alan 답변 반환까지 전체 흐름 처리
 Deno.serve(async request => {
   if (request.method === "OPTIONS") {
     return new Response("ok", {
