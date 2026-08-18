@@ -897,7 +897,10 @@ function RecipeDetailPage() {
         if (sessionError) throw sessionError;
         if (!session || !isActive) return;
 
-        const result = await getCachedCustomRecipe(id);
+        const result = await getCachedCustomRecipe(id, {
+          allergenIds: appliedAllergenIds,
+          veganTypeId: appliedVeganTypeId,
+        });
         if (!isActive || !result?.customRecipe) return;
 
         setAiCustomRecipe(result.customRecipe);
@@ -915,7 +918,14 @@ function RecipeDetailPage() {
     return () => {
       isActive = false;
     };
-  }, [id, isRecipeLoading, isUserConditionsLoading, recipe?.id]);
+  }, [
+    id,
+    isRecipeLoading,
+    isUserConditionsLoading,
+    recipe?.id,
+    appliedAllergenIds,
+    appliedVeganTypeId,
+  ]);
 
   // AI 분석 중 진행률이 자연스럽게 증가하도록 타이머 실행
   useEffect(() => {
@@ -1011,7 +1021,10 @@ function RecipeDetailPage() {
     setAnalysisState("analyzing");
 
     try {
-      const result = await generateCustomRecipe(id);
+      const result = await generateCustomRecipe(id, {
+        allergenIds: appliedAllergenIds,
+        veganTypeId: appliedVeganTypeId,
+      });
 
       if (result?.status === "replacement_not_required") {
         setAnalysisProgress(0);

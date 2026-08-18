@@ -1,7 +1,14 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
-type GenerateRequest = { recipeId?: string; cacheOnly?: boolean };
+type GenerateRequest = {
+  recipeId?: string;
+  cacheOnly?: boolean;
+  conditions?: {
+    allergenIds?: string[];
+    veganTypeId?: string | null;
+  };
+};
 type NamedRelation = { id: string; name: string };
 type OriginalIngredient = {
   id: string;
@@ -544,6 +551,16 @@ Deno.serve(async request => {
   if (!body.recipeId || typeof body.recipeId !== "string") {
     return json({ error: "RECIPE_ID_REQUIRED" }, 400);
   }
+  if (
+    body.conditions != null &&
+    (typeof body.conditions !== "object" ||
+      !Array.isArray(body.conditions.allergenIds) ||
+      body.conditions.allergenIds.some(id => typeof id !== "string" || !id.trim()) ||
+      (body.conditions.veganTypeId != null &&
+        (typeof body.conditions.veganTypeId !== "string" || !body.conditions.veganTypeId.trim())))
+  ) {
+    return json({ error: "INVALID_CONDITIONS" }, 400);
+  }
 
   const supabase = createClient(supabaseUrl, key, {
     global: { headers: { Authorization: authorization } },
@@ -580,12 +597,38 @@ Deno.serve(async request => {
     if (loadError) throw loadError;
     if (!recipeResult.data) return json({ error: "RECIPE_NOT_FOUND" }, 404);
 
-    const veganTypeId = profileResult.data?.vegan_type_id ?? null;
-    const veganType = one(profileResult.data?.vegan_types) as NamedRelation | null;
-    const allergies = (allergyResult.data ?? [])
+    let veganTypeId = profileResult.data?.vegan_type_id ?? null;
+    let veganType = one(profileResult.data?.vegan_types) as NamedRelation | null;
+    let allergies = (allergyResult.data ?? [])
       .map(item => one(item.allergens) as NamedRelation | null)
       .filter((item): item is NamedRelation => Boolean(item));
-    const allergenIds = uniqueSorted((allergyResult.data ?? []).map(item => item.allergen_id));
+    let allergenIds = uniqueSorted((allergyResult.data ?? []).map(item => item.allergen_id));
+
+    // 상세 페이지에서 조건을 수정한 경우 프로필 대신 요청 조건을 검증해 사용합니다.
+    if (body.conditions) {
+      allergenIds = uniqueSorted(body.conditions.allergenIds ?? []);
+      veganTypeId = body.conditions.veganTypeId?.trim() || null;
+
+      const [selectedAllergiesResult, selectedVeganTypeResult] = await Promise.all([
+        allergenIds.length
+          ? supabase.from("allergens").select("id, name").in("id", allergenIds)
+          : Promise.resolve({ data: [], error: null }),
+        veganTypeId
+          ? supabase.from("vegan_types").select("id, name").eq("id", veganTypeId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+
+      if (selectedAllergiesResult.error || selectedVeganTypeResult.error) {
+        throw selectedAllergiesResult.error ?? selectedVeganTypeResult.error;
+      }
+
+      allergies = (selectedAllergiesResult.data ?? []) as NamedRelation[];
+      veganType = selectedVeganTypeResult.data as NamedRelation | null;
+
+      if (allergies.length !== allergenIds.length || (veganTypeId && !veganType)) {
+        return json({ error: "INVALID_CONDITIONS" }, 400);
+      }
+    }
 
     const cached = await findCachedRecipe(
       supabase,
