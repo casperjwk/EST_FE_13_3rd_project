@@ -28,6 +28,9 @@ const VEGAN_TYPE_ORDER = [
 const INGREDIENT_CHECK_CATEGORY_IDS = new Set(["condiments", "kimchi", "meat", "seasoning"]);
 const RECIPE_NOT_FOUND_ERROR = "recipe-not-found";
 
+// 데이터 정렬 및 판별
+
+// 비건 유형 목록 화면 표시할 지정 순서대로 정렬
 function sortVeganTypes(veganTypes) {
   const orderById = new Map(VEGAN_TYPE_ORDER.map((id, index) => [id, index]));
 
@@ -38,6 +41,7 @@ function sortVeganTypes(veganTypes) {
   );
 }
 
+// 조건에 맞는 CSS 모듈 클래스 이름 정리
 function cn(...classNames) {
   return classNames
     .filter(Boolean)
@@ -47,6 +51,7 @@ function cn(...classNames) {
     .join(" ");
 }
 
+// AI 맞춤 레시피 생성 단계
 const analysisSteps = [
   "내 알레르기 정보를 확인하고 있어요",
   "비건 기준을 적용하고 있어요",
@@ -54,6 +59,7 @@ const analysisSteps = [
   "조리 순서를 다시 만들고 있어요",
 ];
 
+// AI 질문 예시
 const suggestedQuestions = [
   "글루텐 프리도 가능한가요?",
   "대체재 없이 만들 수 있나요?",
@@ -61,6 +67,7 @@ const suggestedQuestions = [
   "보관 방법이 궁금해요",
 ];
 
+// 재료 카테고리와 사용자의 알레르기 조건을 비교해 일치하는 알레르기명 탐색
 function findMatchedAllergy(ingredient, allergenIds, categoryMappings, allergyOptions) {
   const matchedMapping = categoryMappings.find(
     mapping =>
@@ -73,6 +80,7 @@ function findMatchedAllergy(ingredient, allergenIds, categoryMappings, allergyOp
     ?.name;
 }
 
+// 재료가 선택한 비건 유형에서 제한되는 카테고리인지 확인
 function isRestrictedForVeganType(ingredient, veganTypeId, veganTypeRestrictions) {
   if (veganTypeId == null || veganTypeId === "") return false;
 
@@ -84,6 +92,9 @@ function isRestrictedForVeganType(ingredient, veganTypeId, veganTypeRestrictions
   );
 }
 
+// 화면 구성 컴포넌트
+
+// 이름과 크기에 맞는 Material 아이콘 렌더링
 function Icon({ name, size = 18 }) {
   const materialIconNames = {
     user: "person",
@@ -109,6 +120,7 @@ function Icon({ name, size = 18 }) {
   );
 }
 
+// 현재 적용된 알레르기 및 비건 조건과 조건 수정 버튼 표시
 function Condition({ allergies, veganType, onOpenConditions }) {
   return (
     <>
@@ -141,6 +153,7 @@ function Condition({ allergies, veganType, onOpenConditions }) {
   );
 }
 
+// 원본 또는 대체 레시피의 재료 목록과 주의 정보 표시
 function IngredientPanel({ ingredients }) {
   return (
     <aside className={cn("ingredient-card")}>
@@ -211,6 +224,7 @@ function IngredientPanel({ ingredients }) {
   );
 }
 
+// AI 맞춤 레시피 생성 단계와 결과 상태에 맞는 안내 화면 표시
 function AnalysisPanel({
   analysisState,
   progress,
@@ -382,6 +396,7 @@ function AnalysisPanel({
   );
 }
 
+// 레시피 정보를 불러오는 동안 표시할 스켈레톤 화면 렌더링
 function RecipeDetailSkeleton() {
   return (
     <div className={cn("recipe-page skeleton-page")} aria-busy="true" aria-live="polite">
@@ -434,6 +449,9 @@ function RecipeDetailSkeleton() {
   );
 }
 
+// 레시피 상세 페이지
+
+// 레시피 조회, 조건 분석, 즐겨찾기 및 AI 기능을 관리
 function RecipeDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -551,9 +569,13 @@ function RecipeDetailPage() {
         }
       : recipe;
 
+  // 레시피 및 즐겨찾기 데이터 불러오기
+
+  // 레시피 상세 정보를 불러오고 로그인 사용자의 최근 본 레시피 기록
   useEffect(() => {
     let isActive = true;
 
+    // 로그인 사용자의 레시피 조회 기록 저장
     async function recordLoadedRecipeView(recipeId) {
       const {
         data: { session },
@@ -573,6 +595,7 @@ function RecipeDetailPage() {
       }
     }
 
+    // URL의 레시피 ID로 상세 데이터와 조리 단계 조회
     async function loadRecipe() {
       if (!id) {
         setRecipeError(RECIPE_NOT_FOUND_ERROR);
@@ -650,9 +673,11 @@ function RecipeDetailPage() {
     };
   }, [id]);
 
+  // 해당 레시피 즐겨찾기 된 횟수 불러오기
   useEffect(() => {
     let isActive = true;
 
+    // 현재 레시피 ID에 해당하는 즐겨찾기 개수 조회
     async function loadFavoriteCount() {
       if (!id) return;
 
@@ -673,9 +698,11 @@ function RecipeDetailPage() {
     };
   }, [id]);
 
+  // 로그인 사용자의 현재 레시피를 즐겨찾기 여부 확인
   useEffect(() => {
     let isActive = true;
 
+    // 사용자 즐겨찾기 목록에서 현재 레시피의 저장 여부 확인
     async function loadFavoriteState() {
       setIsFavorite(false);
 
@@ -708,9 +735,13 @@ function RecipeDetailPage() {
     };
   }, [id]);
 
+  // 알레르기 및 비건 조건 데이터 불러오기
+
+  // 조건 수정에 필요한 알레르기, 비건 유형 및 카테고리 매핑 불러오기
   useEffect(() => {
     let isActive = true;
 
+    // Supabase에서 맞춤 조건 선택지와 제한 기준 데이터 함께 조회.
     async function loadConditionOptions() {
       setIsConditionDataLoading(true);
       try {
@@ -755,9 +786,11 @@ function RecipeDetailPage() {
     };
   }, []);
 
+  // 로그인 사용자의 현재 알레르기 및 비건 설정 불러오기
   useEffect(() => {
     let isActive = true;
 
+    // 사용자 프로필과 알레르기 설정을 조회해 적용 조건 초기화
     async function loadUserConditions() {
       setIsUserConditionsLoading(true);
       try {
@@ -846,11 +879,15 @@ function RecipeDetailPage() {
     };
   }, []);
 
+  // AI 맞춤 레시피 상태 관리
+
+  // 이전에 생성해 둔 맞춤 레시피가 있다면 캐시에서 불러오기
   useEffect(() => {
     if (isRecipeLoading || isUserConditionsLoading || recipe?.id !== id) return undefined;
 
     let isActive = true;
 
+    // 현재 레시피와 사용자 조건에 대응하는 캐시 결과 조회
     async function loadCachedCustomRecipe() {
       try {
         const {
@@ -880,6 +917,7 @@ function RecipeDetailPage() {
     };
   }, [id, isRecipeLoading, isUserConditionsLoading, recipe?.id]);
 
+  // AI 분석 중 진행률이 자연스럽게 증가하도록 타이머 실행
   useEffect(() => {
     if (analysisState !== "analyzing") return undefined;
     const timer = window.setInterval(() => {
@@ -888,10 +926,14 @@ function RecipeDetailPage() {
     return () => window.clearInterval(timer);
   }, [analysisState]);
 
+  // ===== 모달 공통 동작 관리 =====
+
+  // 간단 레시피 모달이 열리면 배경 스크롤과 Escape 닫기 제어
   useEffect(() => {
     if (!isSimpleRecipeOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // Escape 키 입력 시 간단 레시피 모달 닫기
     const handleKeyDown = event => {
       if (event.key === "Escape") setIsSimpleRecipeOpen(false);
     };
@@ -902,10 +944,12 @@ function RecipeDetailPage() {
     };
   }, [isSimpleRecipeOpen]);
 
+  // 조건 수정 모달이 열리면 배경 스크롤과 Escape 닫기 제어
   useEffect(() => {
     if (!isConditionModalOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // Escape 키 입력 시 조건 수정 모달 닫기
     const handleKeyDown = event => {
       if (event.key === "Escape") setIsConditionModalOpen(false);
     };
@@ -916,10 +960,12 @@ function RecipeDetailPage() {
     };
   }, [isConditionModalOpen]);
 
+  // 더 알아보기 모달이 열리면 배경 스크롤, Escape 닫기 제어
   useEffect(() => {
     if (!isMoreInfoOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // Escape 키 입력 시 더 알아보기 모달 닫기
     const handleKeyDown = event => {
       if (event.key === "Escape") setIsMoreInfoOpen(false);
     };
@@ -930,6 +976,9 @@ function RecipeDetailPage() {
     };
   }, [isMoreInfoOpen]);
 
+  // AI 맞춤 레시피 및 즐겨찾기 동작
+
+  // 로그인 여부를 확인한 뒤 AI 맞춤 레시피 생성 시작
   const startAnalysis = async () => {
     if (analysisState === "analyzing") return;
 
@@ -988,11 +1037,13 @@ function RecipeDetailPage() {
     }
   };
 
+  // AI 맞춤 결과에서 원본 레시피 화면 되돌리기
   const showOriginalRecipe = () => {
     setAnalysisProgress(0);
     setAnalysisState("before");
   };
 
+  // 로그인 사용자의 현재 레시피 즐겨찾기 상태를 추가, 해제
   const toggleFavorite = async () => {
     if (!recipe?.id || isFavoriteUpdating) return;
 
@@ -1031,31 +1082,39 @@ function RecipeDetailPage() {
     }
   };
 
+  // 모달 및 조건 수정 동작
+
+  // 간단 레시피를 첫 단계부터 보여 주는 모달 열기
   const openSimpleRecipe = () => {
     setSimpleRecipeStep(0);
     setIsSimpleRecipeOpen(true);
   };
 
+  // 간단 레시피 모달을 닫습니다.
   const closeSimpleRecipe = () => setIsSimpleRecipeOpen(false);
 
+  // 현재 적용 조건을 임시 선택값에 복사한 뒤 조건 수정 모달 열기
   const openConditionModal = () => {
     setDraftAllergies([...appliedAllergies]);
     setDraftVeganType(appliedVeganType);
     setIsConditionModalOpen(true);
   };
 
+  // 변경 내용 취소하고 조건 수정 모달 닫기
   const closeConditionModal = () => {
     setDraftAllergies([...appliedAllergies]);
     setDraftVeganType(appliedVeganType);
     setIsConditionModalOpen(false);
   };
 
+  // 선택한 알레르기 항목 임시 조건 목록에 추가, 제거
   const toggleAllergy = allergy => {
     setDraftAllergies(current =>
       current.includes(allergy) ? current.filter(item => item !== allergy) : [...current, allergy],
     );
   };
 
+  // 임시 알레르기 및 비건 조건 적용, AI 분석 결과 초기화
   const applyConditions = () => {
     setAppliedAllergies([...draftAllergies]);
     setAppliedAllergenIds(
@@ -1074,6 +1133,9 @@ function RecipeDetailPage() {
     setIsConditionModalOpen(false);
   };
 
+  // AI 레시피 질문 동작
+
+  // 입력한 질문과 이전 대화 내용 Edge Function에 전달하고 답변 표시
   const askRecipeQuestion = async event => {
     event.preventDefault();
     const question = recipeQuestion.trim();
