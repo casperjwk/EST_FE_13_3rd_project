@@ -134,7 +134,7 @@ const UserAvatarIcon = () => (
 );
 
 const UserDietSection = () => {
-  /* 통계 데이터 상태 관리 */
+  /* 통계 및 회원 데이터 상태 */
   const [stats, setStats] = useState({
     totalUsers: 0,
     allergyRatio: 0,
@@ -142,47 +142,39 @@ const UserDietSection = () => {
     totalRecipes: 0,
     monthlyAiSearches: 0,
   });
-
-  /* 회원 상세 정보 상태 관리 */
   const [userInfo, setUserInfo] = useState({
     name: "로딩 중...",
     status: "정상 회원",
     email: "",
     joinDate: "",
+    profileImageUrl: "",
     favoritesCount: 0,
     allergies: [],
-    veganType: {
-      name: "설정되지 않음",
-      status: "미적용",
-      description: "지정된 비건 식단이 없습니다.",
-    },
+    veganType: { name: "설정되지 않음", status: "미적용", description: "지정된 비건 식단이 없습니다." },
     appliedConditions: [],
   });
-
-  /* 로딩 상태 관리 */
   const [isLoading, setIsLoading] = useState(true);
 
-  /* Supabase에서 회원 및 통계 데이터 조회 */
+  /* Supabase 데이터 연동 */
   useEffect(() => {
     const fetchAdminDietData = async () => {
       try {
-        const currentEmail = localStorage.getItem("userEmail") || "han77ilab@naver.com";
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        let userId = authUser?.id;
+        let userEmail = authUser?.email || "";
 
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("email", currentEmail)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error("프로필 조회 오류:", profileError.message);
+        let profileData = null;
+        if (userId) {
+          const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+          profileData = data;
         }
-
-        let userId = profileData?.id;
 
         if (!profileData) {
           const { data: firstProfile } = await supabase.from("profiles").select("*").limit(1).maybeSingle();
           if (firstProfile) {
+            profileData = firstProfile;
             userId = firstProfile.id;
           }
         }
@@ -195,19 +187,17 @@ const UserDietSection = () => {
           status: "미적용",
           description: "선택된 비건 식단이 없습니다.",
         };
-
         if (targetProfile.vegan_type_id) {
           const { data: veganTypeData } = await supabase
             .from("vegan_types")
             .select("name, description")
             .eq("id", targetProfile.vegan_type_id)
             .maybeSingle();
-
           if (veganTypeData) {
             veganInfo = {
               name: veganTypeData.name,
               status: "현재 적용 중",
-              description: veganTypeData.description || "선택하신 비건 식단 가이드가 적용됩니다.",
+              description: veganTypeData.description || "가이드 적용 중",
             };
           }
         }
@@ -218,50 +208,29 @@ const UserDietSection = () => {
             .from("user_allergies")
             .select("allergen_id")
             .eq("user_id", userId);
-
-          if (userAllergiesData && userAllergiesData.length > 0) {
+          if (userAllergiesData?.length > 0) {
             const allergenIds = userAllergiesData.map(item => item.allergen_id);
             const { data: allergensData } = await supabase.from("allergens").select("name").in("id", allergenIds);
-
-            if (allergensData) {
-              allergyNames = allergensData.map(a => a.name);
-            }
+            if (allergensData) allergyNames = allergensData.map(a => a.name);
           }
         }
 
         const appliedConditions = [...allergyNames.map(name => ({ text: `${name} 제외`, type: "danger" }))];
-        if (targetProfile.vegan_type_id) {
-          appliedConditions.push({ text: `${veganInfo.name} 가이드`, type: "primary" });
-        }
+        if (targetProfile.vegan_type_id) appliedConditions.push({ text: `${veganInfo.name} 가이드`, type: "primary" });
 
-        /* 통계 데이터 집계 */
         const { count: totalUsersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-
         const { count: veganUsersCount } = await supabase
           .from("profiles")
           .select("*", { count: "exact", head: true })
           .not("vegan_type_id", "is", null);
-
-        const { count: recipesCount } = await supabase.recipes.select("*", { count: "exact", head: true });
-
-        let allergyPercentage = 0;
-        if (totalUsersCount && totalUsersCount > 0) {
-          const { data: allergyData } = await supabase.from("user_allergies").select("user_id");
-          if (allergyData) {
-            const uniqueAllergyUsers = new Set(allergyData.map(item => item.user_id)).size;
-            allergyPercentage = Math.round((uniqueAllergyUsers / totalUsersCount) * 1000) / 10;
-          }
-        }
-
-        const currentRecipes = recipesCount || 0;
-        const currentUsers = totalUsersCount || 0;
+        const { count: recipesCount } = await supabase.from("recipes").select("*", { count: "exact", head: true });
 
         setStats({
-          totalUsers: currentUsers,
-          allergyRatio: allergyPercentage,
+          totalUsers: totalUsersCount || 0,
+          allergyRatio: 0,
           veganUsers: veganUsersCount || 0,
-          totalRecipes: currentRecipes,
-          monthlyAiSearches: currentRecipes * 12 + currentUsers * 15,
+          totalRecipes: recipesCount || 0,
+          monthlyAiSearches: (recipesCount || 0) * 12 + (totalUsersCount || 0) * 15,
         });
 
         let favCount = 0;
@@ -276,8 +245,9 @@ const UserDietSection = () => {
         setUserInfo({
           name: targetProfile.nickname || "관리자",
           status: "정상 회원",
-          email: targetProfile.email || currentEmail,
+          email: userEmail || "admin@han77ilab.com",
           joinDate: formattedJoinDate,
+          profileImageUrl: targetProfile.profile_image_url || "",
           favoritesCount: favCount,
           allergies: allergyNames,
           veganType: veganInfo,
@@ -285,16 +255,14 @@ const UserDietSection = () => {
             appliedConditions.length > 0 ? appliedConditions : [{ text: "적용된 조건 없음", type: "primary" }],
         });
       } catch (err) {
-        console.error("관리자 식단 관리 데이터 로드 예외:", err);
+        console.error("데이터 로드 오류:", err);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchAdminDietData();
   }, []);
 
-  /* 상단 통계 카드 목록 데이터 */
   const statCards = [
     { id: "totalUsers", label: "전체 가입 회원", value: `${stats.totalUsers.toLocaleString()}명`, icon: <UsersIcon /> },
     { id: "allergyRatio", label: "알레르기 보유 비율", value: `${stats.allergyRatio}%`, icon: <PercentIcon /> },
@@ -308,20 +276,15 @@ const UserDietSection = () => {
     },
   ];
 
-  /* 데이터 로딩 중일 때의 화면 처리 */
-  if (isLoading) {
-    return <div style={{ padding: "40px", textAlign: "center" }}>데이터 불러오는 중...</div>;
-  }
+  if (isLoading) return <div style={{ padding: "40px", textAlign: "center" }}>데이터 불러오는 중...</div>;
 
   return (
     <div className={styles.container}>
-      {/* 상단 헤더 영역 */}
       <div className={styles.header}>
         <h1 className={styles.title}>회원 맞춤 식단 DB 관리자</h1>
         <p className={styles.subtitle}>등록된 회원의 알레르기 및 비건 조건 데이터를 조회하고 수정합니다.</p>
       </div>
 
-      {/* 통계 카드 그리드 영역 */}
       <div className={styles.statsGrid}>
         {statCards.map(item => (
           <div key={item.id} className={styles.statCard}>
@@ -334,15 +297,24 @@ const UserDietSection = () => {
         ))}
       </div>
 
-      {/* 메인 콘텐츠 카드 영역 */}
       <div className={styles.contentCard}>
         <h2 className={styles.cardTitle}>식단 정보</h2>
-
-        {/* 회원 프로필 요약 박스 */}
         <div className={styles.userProfileBox}>
           <div className={styles.userInfoGroup}>
-            <div className={styles.userAvatar}>
-              <UserAvatarIcon />
+            {/* 프로필 이미지 동적 렌더링 */}
+            <div
+              className={styles.userAvatar}
+              style={{ overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              {userInfo.profileImageUrl ? (
+                <img
+                  src={userInfo.profileImageUrl}
+                  alt="회원 프로필"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <UserAvatarIcon />
+              )}
             </div>
             <div className={styles.userDetails}>
               <div className={styles.userNameWrapper}>
@@ -353,7 +325,6 @@ const UserDietSection = () => {
               <p className={styles.userJoinDate}>가입일: {userInfo.joinDate}</p>
             </div>
           </div>
-
           <div className={styles.favoriteAction}>
             <div className={styles.favoriteCount}>{userInfo.favoritesCount}</div>
             <button className={styles.favoriteBtn}>
@@ -363,7 +334,7 @@ const UserDietSection = () => {
           </div>
         </div>
 
-        {/* 보유 알레르기 섹션 */}
+        {/* 알레르기 및 비건 정보 섹션 */}
         <div className={styles.sectionBlock}>
           <div className={styles.sectionHeader}>
             <h3 className={`${styles.sectionTitle} ${styles.dangerTitle}`}>
@@ -384,8 +355,6 @@ const UserDietSection = () => {
             )}
           </div>
         </div>
-
-        {/* 지정 비건 유형 섹션 */}
         <div className={styles.sectionBlock}>
           <h3 className={`${styles.sectionTitle} ${styles.primaryTitle}`}>
             <LeafIcon />
@@ -402,23 +371,6 @@ const UserDietSection = () => {
               </div>
               <p className={styles.veganDesc}>{userInfo.veganType.description}</p>
             </div>
-          </div>
-        </div>
-
-        {/* 현재 적용 중인 조건 섹션 */}
-        <div className={styles.sectionBlock}>
-          <h3 className={styles.sectionTitle}>현재 적용 중인 조건</h3>
-          <div className={styles.tagList}>
-            {userInfo.appliedConditions.map((cond, idx) => (
-              <span
-                key={idx}
-                className={`${styles.appliedTag} ${
-                  cond.type === "danger" ? styles.dangerNotice : cond.type === "primary" ? styles.primaryNotice : ""
-                }`}
-              >
-                {cond.text}
-              </span>
-            ))}
           </div>
         </div>
       </div>
