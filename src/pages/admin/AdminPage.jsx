@@ -5,7 +5,9 @@ import UserDietSection from "./UserDietSection";
 import SystemSettingsSection from "./SystemSettingsSection";
 import styles from "./AdminPage.module.css";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
 
+/* 사이드바 메뉴 및 아바타 아이콘 컴포넌트 */
 const DashboardIcon = () => (
   <svg
     width="18"
@@ -42,7 +44,6 @@ const UserDietIcon = () => (
   </svg>
 );
 
-// 레시피 추가 페이지로 이동할 때 쓸 플러스 아이콘
 const PlusIcon = () => (
   <svg
     width="18"
@@ -92,41 +93,43 @@ const UserAvatarIcon = () => (
 );
 
 const AdminPage = () => {
+  /* 상태 관리 변수 선언 */
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  /* 전역 인증 및 프로필 정보 연동 */
+  const { user, profile } = useAuth();
+  const profileImageUrl = profile?.profile_image_url ?? "";
+  const nickname = profile?.nickname ?? "관리자";
+  const userEmail = user?.email ?? "";
+
+  /* 관리자 권한 검증 로직 */
   useEffect(() => {
     const checkAdminAuth = async () => {
       try {
-        // 1. Supabase 현재 로그인 세션/유저 정보 확인
         const {
-          data: { user },
+          data: { user: authUser },
           error: userError,
         } = await supabase.auth.getUser();
 
-        if (userError || !user) {
+        if (userError || !authUser) {
           alert("로그인이 필요한 페이지입니다.");
           window.location.href = "/login";
           return;
         }
 
-        console.log("현재 로그인한 유저 ID:", user.id);
-
-        // 2. Supabase admins 테이블에서 현재 유저의 ID가 등록되어 있는지 조회
         const { data: adminData, error: adminError } = await supabase
           .from("admins")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", authUser.id)
           .maybeSingle();
 
         if (adminError) throw adminError;
 
         if (adminData) {
-          // admins 테이블에 존재함 -> 관리자 승인
           setIsAuthorized(true);
         } else {
-          // 존재하지 않음 -> 권한 없음
           alert("접근 권한이 없습니다. 관리자만 접근할 수 있습니다.");
           window.location.href = "/";
         }
@@ -142,6 +145,7 @@ const AdminPage = () => {
     checkAdminAuth();
   }, []);
 
+  /* 로딩 중이거나 권한이 없을 때의 화면 처리 */
   if (isLoading) {
     return <div style={{ padding: "40px", textAlign: "center" }}>보안 권한 확인 중...</div>;
   }
@@ -152,13 +156,16 @@ const AdminPage = () => {
 
   return (
     <div className={styles.outerWrapper}>
+      {/* 사이드바 영역 */}
       <aside className={styles.sidebar}>
+        {/* 로고 영역 */}
         <div className={styles.logoArea}>
           <a href="/" className={styles.logoLink}>
             <img src={logoImg} alt="한끼랩 로고" className={styles.logoImage} />
           </a>
         </div>
 
+        {/* 네비게이션 메뉴 영역 */}
         <nav className={styles.navMenu}>
           <div className={styles.category}>
             <span className={styles.categoryTitle}>GENERAL</span>
@@ -176,8 +183,6 @@ const AdminPage = () => {
               <UserDietIcon />
               <span>회원 식단 관리</span>
             </button>
-
-            {/* /create 페이지로 이동하는 레시피 추가 버튼 */}
             <button
               className={styles.navItem}
               onClick={() => {
@@ -201,17 +206,32 @@ const AdminPage = () => {
           </div>
         </nav>
 
+        {/* 하단 프로필 영역 */}
         <div className={styles.profileArea}>
-          <div className={styles.avatar}>
-            <UserAvatarIcon />
+          <div
+            className={styles.avatar}
+            style={{ overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            {profileImageUrl ? (
+              <img
+                src={profileImageUrl}
+                alt="관리자 프로필"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <UserAvatarIcon />
+            )}
           </div>
           <div>
-            <p className={styles.userName}>관리자</p>
-            <p className={styles.userRole}>super_admin</p>
+            <p className={styles.userName} style={{ marginBottom: "6px" }}>
+              {nickname}
+            </p>
+            <p className={styles.userRole}>{userEmail}</p>
           </div>
         </div>
       </aside>
 
+      {/* 메인 콘텐츠 영역 */}
       <main className={styles.mainContent}>
         {activeTab === "dashboard" && <DashboardSection />}
         {activeTab === "userDiet" && <UserDietSection />}
