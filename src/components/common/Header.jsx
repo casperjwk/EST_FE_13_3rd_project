@@ -1,60 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../../context/AuthContext";
-import { supabase } from "../../lib/supabase";
 import logoImg from "../../assets/logo.svg";
 import styles from "./common.module.css";
 
 function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const isLoggedIn = !!user;
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [profile, setProfile] = useState({ nickname: "", profileImageUrl: "" });
-
-  useEffect(() => {
-    if (!user) {
-      setProfile({ nickname: "", profileImageUrl: "" });
-      return;
-    }
-    let isActive = true;
-
-    supabase
-      .from("profiles")
-      .select("nickname, profile_image_url")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!isActive) return;
-        if (error) {
-          console.error("[HankkiLab] Header profile fetch error:", error);
-          return;
-        }
-        setProfile({
-          nickname: data?.nickname ?? "",
-          profileImageUrl: data?.profile_image_url ?? "",
-        });
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [user]);
-
   const closeMenu = () => setMenuOpen(false);
 
   const handleLogout = async () => {
-    // 1. 로그아웃하기 전 미리 홈 화면으로 이동시켜서 보호된 페이지 리다이렉트를 방지합니다.
     navigate("/");
-
-    // 2. 그 후 로그아웃 및 메뉴 상태를 정리합니다.
     await signOut();
     closeMenu();
     setProfileMenuOpen(false);
   };
+
+  // 프로필 이미지와 닉네임을 전역 profile 객체에서 바로 추출합니다.
+  const profileImageUrl = profile?.profile_image_url ?? "";
+  const nickname = profile?.nickname ?? "";
 
   return (
     <header className={styles["common-header"]}>
@@ -80,15 +49,11 @@ function Header() {
             <div className={styles["common-header__profile-wrap"]}>
               <button className={styles["common-header__profile"]} onClick={() => setProfileMenuOpen(!profileMenuOpen)}>
                 <div className={styles["common-header__profile-circle"]}>
-                  {profile.profileImageUrl && (
-                    <img
-                      src={profile.profileImageUrl}
-                      alt="프로필 사진"
-                      className={styles["common-header__profile-img"]}
-                    />
+                  {profileImageUrl && (
+                    <img src={profileImageUrl} alt="프로필 사진" className={styles["common-header__profile-img"]} />
                   )}
                 </div>
-                <span className="text-s">{profile.nickname}</span>
+                <span className="text-s">{nickname}</span>
                 <span className={`material-symbols-outlined ${styles["common-header__profile-arrow"]}`}>
                   expand_more
                 </span>
@@ -146,15 +111,11 @@ function Header() {
             <>
               <div className={styles["common-header__mobile-profile"]}>
                 <div className={styles["common-header__profile-circle"]}>
-                  {profile.profileImageUrl && (
-                    <img
-                      src={profile.profileImageUrl}
-                      alt="프로필 사진"
-                      className={styles["common-header__profile-img"]}
-                    />
+                  {profileImageUrl && (
+                    <img src={profileImageUrl} alt="프로필 사진" className={styles["common-header__profile-img"]} />
                   )}
                 </div>
-                <span className="text-s">{profile.nickname}</span>
+                <span className="text-s">{nickname}</span>
               </div>
               <Link to="/" className={`${styles["common-header__mobile-link"]} text-s`} onClick={closeMenu}>
                 홈
