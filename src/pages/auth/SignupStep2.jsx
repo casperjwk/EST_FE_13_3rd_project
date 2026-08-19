@@ -58,7 +58,11 @@ export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
   const [allergensList, setAllergensList] = useState([]);
   const [veganTypesList, setVeganTypesList] = useState([]);
   const [selectedAllergies, setSelectedAllergies] = useState(initialData.allergies || []);
-  const [selectedVegan, setSelectedVegan] = useState(initialData.veganType || "none");
+
+  // 🟢 초기 비건 유형이 없거나 "none"일 경우 기본값으로 "general" 지정
+  const [selectedVegan, setSelectedVegan] = useState(
+    initialData.veganType && initialData.veganType !== "none" ? initialData.veganType : "general",
+  );
 
   // Supabase에서 알레르기 및 비건 타입 데이터 가져오기
   useEffect(() => {
@@ -82,6 +86,14 @@ export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
           console.error("비건 타입 목록 로드 실패:", veganError.message);
         } else if (veganData) {
           setVeganTypesList(veganData);
+
+          // 🟢 데이터가 로드된 후, 현재 선택된 값이 없거나 "none"이라면 '일반' 항목의 id를 찾아 기본 선택
+          if (!initialData.veganType || initialData.veganType === "none") {
+            const generalType = veganData.find(item => item.name === "일반" || item.id === "general");
+            if (generalType) {
+              setSelectedVegan(generalType.id);
+            }
+          }
         }
       } catch (err) {
         console.error("마스터 데이터 조회 예외:", err);
@@ -89,7 +101,7 @@ export default function SignupStep2({ onPrev, onComplete, initialData = {} }) {
     };
 
     fetchMasterData();
-  }, []);
+  }, [initialData.veganType]);
 
   const toggleAllergy = id => {
     if (selectedAllergies.includes(id)) {
