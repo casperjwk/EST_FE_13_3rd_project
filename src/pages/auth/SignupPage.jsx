@@ -4,9 +4,10 @@ import SignupStep2 from "./SignupStep2";
 import { supabase } from "../../lib/supabase";
 
 export default function SignupPage() {
-  const [step, setStep] = useState(1); // 1: 기본정보, 2: 식단정보선택
+  /* 회원가입 단계 상태 관리 (1: 기본정보, 2: 식단정보선택) */
+  const [step, setStep] = useState(1);
 
-  // 회원가입 전체 폼 데이터 통합 관리
+  /* 회원가입 전체 폼 데이터 통합 관리 상태 */
   const [signupData, setSignupData] = useState({
     email: "",
     password: "",
@@ -17,7 +18,7 @@ export default function SignupPage() {
     veganType: "none",
   });
 
-  // Step 1 ➔ Step 2 이동
+  /* Step 1에서 Step 2로 이동 핸들러 */
   const handleNextStep = step1Data => {
     setSignupData(prev => ({
       ...prev,
@@ -27,7 +28,7 @@ export default function SignupPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Step 2 ➔ Step 1 이동 (입력한 데이터 유지용으로 현재 값도 같이 보존)
+  /* Step 2에서 Step 1로 이동 핸들러 (입력 데이터 유지) */
   const handlePrevStep = (step2Data = {}) => {
     setSignupData(prev => ({
       ...prev,
@@ -37,7 +38,7 @@ export default function SignupPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 회원가입 최종 제출 ➔ Supabase Auth 및 profiles DB 연동
+  /* 회원가입 최종 제출 및 Supabase Auth / profiles DB 연동 핸들러 */
   const handleCompleteSignup = async (step2Data = {}) => {
     const finalData = {
       ...signupData,
@@ -45,7 +46,7 @@ export default function SignupPage() {
     };
 
     try {
-      // 1. Supabase Auth 회원가입 진행 (이메일/비밀번호)
+      /* 1. Supabase Auth 회원가입 진행 */
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: finalData.email,
         password: finalData.password,
@@ -65,7 +66,7 @@ export default function SignupPage() {
       const user = authData?.user;
 
       if (user) {
-        // 2. profiles DB 테이블에 유저 정보 저장 (upsert를 사용하여 중복 키 충돌 방지)
+        /* 2. profiles 테이블에 유저 프로필 정보 저장 (upsert 처리) */
         const veganValue = finalData.veganType && finalData.veganType !== "none" ? finalData.veganType : "general";
 
         const { error: dbError } = await supabase.from("profiles").upsert({
@@ -81,7 +82,7 @@ export default function SignupPage() {
           return;
         }
 
-        // 3. 알레르기 선택 정보 저장
+        /* 3. 사용자가 선택한 알레르기 정보 저장 */
         if (finalData.allergies && finalData.allergies.length > 0) {
           const allergyInserts = finalData.allergies.map(allergenId => ({
             user_id: user.id,
@@ -104,7 +105,7 @@ export default function SignupPage() {
     }
   };
 
-  // 로그인 페이지 이동
+  /* 로그인 페이지 이동 핸들러 */
   const handleGoToLogin = () => {
     window.location.href = "/login";
   };
