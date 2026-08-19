@@ -5,10 +5,10 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null); // 🟢 프로필 상태 추가
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🟢 프로필 정보를 Supabase에서 가져오는 함수 (외부에서도 호출 가능)
+  // 프로필 정보를 Supabase에서 가져오는 함수
   const fetchProfile = useCallback(async userId => {
     try {
       const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           localStorage.setItem("userEmail", session.user.email);
           localStorage.setItem("isLoggedIn", "true");
-          await fetchProfile(session.user.id); // 🟢 로그인 시 프로필 함께 로드
+          await fetchProfile(session.user.id);
         } else {
           const savedEmail = localStorage.getItem("userEmail");
           if (savedEmail) {
@@ -60,10 +60,10 @@ export const AuthProvider = ({ children }) => {
         setUser(session.user);
         localStorage.setItem("userEmail", session.user.email);
         localStorage.setItem("isLoggedIn", "true");
-        await fetchProfile(session.user.id); // 🟢 상태 변경 시 프로필 로드
+        await fetchProfile(session.user.id);
       } else {
         setUser(null);
-        setProfile(null); // 🟢 로그아웃 시 프로필 초기화
+        setProfile(null);
         localStorage.removeItem("userEmail");
         localStorage.removeItem("isLoggedIn");
       }
@@ -75,7 +75,57 @@ export const AuthProvider = ({ children }) => {
     };
   }, [fetchProfile]);
 
-  // 로그아웃 함수 (현재 페이지에 머무르도록 window.location.href 제거)
+  // Supabase Realtime 구독
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const profileChannel = supabase
+      .channel(`public:profiles:id=eq.${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        payload => {
+          if (payload.new) {
+            setProfile(payload.new);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileChannel);
+    };
+  }, [user?.id]);
+
+  //  마이페이지에서 다른 페이지(홈, 레시피 등)로 이동하거나 창을 클릭할 때 즉시 최신 프로필 동기화
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && user?.id) {
+        fetchProfile(user.id);
+      }
+    };
+
+    const handleFocus = () => {
+      if (user?.id) {
+        fetchProfile(user.id);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [user?.id, fetchProfile]);
+
+  // 로그아웃 함수
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);

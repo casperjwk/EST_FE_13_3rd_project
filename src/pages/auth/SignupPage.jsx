@@ -66,7 +66,7 @@ export default function SignupPage() {
 
       if (user) {
         // 2. profiles DB 테이블에 유저 정보 저장 (upsert를 사용하여 중복 키 충돌 방지)
-        const veganValue = finalData.veganType && finalData.veganType !== "none" ? finalData.veganType : null;
+        const veganValue = finalData.veganType && finalData.veganType !== "none" ? finalData.veganType : "general";
 
         const { error: dbError } = await supabase.from("profiles").upsert({
           id: user.id,
