@@ -134,7 +134,7 @@ const UserAvatarIcon = () => (
 );
 
 const UserDietSection = () => {
-  /* 통계 및 회원 데이터 상태 */
+  /* 통계 및 회원 데이터 상태 관리 */
   const [stats, setStats] = useState({
     totalUsers: 0,
     allergyRatio: 0,
@@ -155,7 +155,7 @@ const UserDietSection = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  /* Supabase 데이터 연동 */
+  /* Supabase 실시간 데이터 연동 및 통계 계산 */
   useEffect(() => {
     const fetchAdminDietData = async () => {
       try {
@@ -218,6 +218,7 @@ const UserDietSection = () => {
         const appliedConditions = [...allergyNames.map(name => ({ text: `${name} 제외`, type: "danger" }))];
         if (targetProfile.vegan_type_id) appliedConditions.push({ text: `${veganInfo.name} 가이드`, type: "primary" });
 
+        /* Supabase 테이블에서 실시간 카운트 조회 */
         const { count: totalUsersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
         const { count: veganUsersCount } = await supabase
           .from("profiles")
@@ -225,12 +226,24 @@ const UserDietSection = () => {
           .not("vegan_type_id", "is", null);
         const { count: recipesCount } = await supabase.from("recipes").select("*", { count: "exact", head: true });
 
+        const currentUsers = totalUsersCount || 0;
+        const currentRecipes = recipesCount || 0;
+
+        let allergyPercentage = 0;
+        if (currentUsers > 0) {
+          const { data: allergyData } = await supabase.from("user_allergies").select("user_id");
+          if (allergyData) {
+            const uniqueAllergyUsers = new Set(allergyData.map(item => item.user_id)).size;
+            allergyPercentage = Math.round((uniqueAllergyUsers / currentUsers) * 100);
+          }
+        }
+
         setStats({
-          totalUsers: totalUsersCount || 0,
-          allergyRatio: 0,
+          totalUsers: currentUsers,
+          allergyRatio: allergyPercentage,
           veganUsers: veganUsersCount || 0,
-          totalRecipes: recipesCount || 0,
-          monthlyAiSearches: (recipesCount || 0) * 12 + (totalUsersCount || 0) * 15,
+          totalRecipes: currentRecipes,
+          monthlyAiSearches: currentRecipes * 12 + currentUsers * 15,
         });
 
         let favCount = 0;
@@ -301,7 +314,6 @@ const UserDietSection = () => {
         <h2 className={styles.cardTitle}>식단 정보</h2>
         <div className={styles.userProfileBox}>
           <div className={styles.userInfoGroup}>
-            {/* 프로필 이미지 동적 렌더링 */}
             <div
               className={styles.userAvatar}
               style={{ overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -334,7 +346,6 @@ const UserDietSection = () => {
           </div>
         </div>
 
-        {/* 알레르기 및 비건 정보 섹션 */}
         <div className={styles.sectionBlock}>
           <div className={styles.sectionHeader}>
             <h3 className={`${styles.sectionTitle} ${styles.dangerTitle}`}>
@@ -355,6 +366,7 @@ const UserDietSection = () => {
             )}
           </div>
         </div>
+
         <div className={styles.sectionBlock}>
           <h3 className={`${styles.sectionTitle} ${styles.primaryTitle}`}>
             <LeafIcon />
