@@ -155,7 +155,7 @@ const UserDietSection = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  /* Supabase 데이터 연동 및 통계 계산 로직 */
+  /* Supabase 데이터 연동 및 통계 계산 로직 (사이드바와 동일하게 이메일 기준으로 통일) */
   useEffect(() => {
     const fetchAdminDietData = async () => {
       try {
@@ -163,17 +163,13 @@ const UserDietSection = () => {
         const {
           data: { user: authUser },
         } = await supabase.auth.getUser();
-        let userId = authUser?.id;
-        let userEmail = authUser?.email || "";
+        let userEmail = authUser?.email || "test@han77ilab.com";
 
-        /* 로그인된 내 계정의 프로필 정보만 정확히 조회 */
-        let profileData = null;
-        if (userId) {
-          const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
-          profileData = data;
-        }
+        /* 이메일을 기준으로 profiles 테이블에서 내 프로필 단건 조회 */
+        const { data: profileData } = await supabase.from("profiles").select("*").eq("email", userEmail).maybeSingle();
 
         const targetProfile = profileData || {};
+        let userId = targetProfile.id || authUser?.id;
         const formattedJoinDate = targetProfile.created_at ? targetProfile.created_at.split("T")[0] : "2026-00-00";
 
         /* 비건 유형 정보 조회 */
@@ -252,15 +248,15 @@ const UserDietSection = () => {
           favCount = favoriteCount || 0;
         }
 
-        /* 프로필 이미지 URL 안전하게 추출 (컬럼명 호환성 보장) */
+        /* 프로필 이미지 URL 안전하게 추출 (사이드바와 동일한 컬럼명 우선순위 적용) */
         const resolvedProfileImg =
           targetProfile.profile_image_url || targetProfile.avatar_url || targetProfile.profile_img || "";
 
         /* 유저 정보 상태 업데이트 */
         setUserInfo({
-          name: targetProfile.nickname || "관리자",
+          name: targetProfile.nickname || "한끼관리자",
           status: "정상 회원",
-          email: userEmail || "admin@han77ilab.com",
+          email: userEmail,
           joinDate: formattedJoinDate,
           profileImageUrl: resolvedProfileImg,
           favoritesCount: favCount,
