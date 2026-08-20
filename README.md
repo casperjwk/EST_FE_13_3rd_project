@@ -81,7 +81,54 @@ gantt
 
 - https://est-fe-13-3rd-project-xi.vercel.app/
 
-## 3. 프로젝트 구조
+## 3. 로컬 실행 방법
+
+### 요구 사항
+
+- Node.js 20.19.0 이상
+- Supabase 프로젝트 (Project URL · Publishable Key)
+- AI 기능 사용 시 Alan API Client ID
+
+### 설치
+
+```bash
+git clone https://github.com/casperjwk/EST_FE_13_3rd_project
+cd EST_FE_13_3rd_project
+npm install
+```
+
+### 환경 변수
+
+`root/.env.local` 을 만들고 필요한 값을 입력합니다.
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+```
+
+`supabase/functions/.env.local` 을 만들고 필요한 값을 입력합니다.
+
+```
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
+
+ALAN_API_BASE_URL=
+ALAN_CLIENT_ID=
+```
+
+### 실행
+
+```bash
+npm run dev
+npm run lint
+npm run build
+npm run preview
+
+npm run supabase:start
+npm run supabase:serve
+```
+
+## 4. 프로젝트 구조
 
 ## 📁 프로젝트 구조
 
@@ -221,14 +268,14 @@ EST-fe-13-3rd-project/
 
 ```
 
-## 4. 향후 개선 사항
+## 5. 향후 개선 사항
 
 - 알레르기 정보 등록 범위 확대
 - 개인화 기능 확대
 - 사용자 참여형 레시피 등록 기능 확대
 - 관리자 및 데이터 관리 고도화
 
-## 5. 기획/디자인 문서
+## 6. 기획/디자인 문서
 
 - **기획서(피그마 슬라이드)**: 사용자 흐름 설계, 리뉴얼 방향성, 스타일 가이드, 개발 기준 및 주요 구현 내용
   링크: https://www.figma.com/slides/uawhVhg1eTzhXLcoq8Nmyc
