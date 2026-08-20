@@ -3,6 +3,7 @@ import styles from "./SystemSettingsSection.module.css";
 import { supabase } from "../../lib/supabase";
 import { useSettings } from "../../context/SettingsContext";
 
+/* 드롭다운 화살표 아이콘 컴포넌트 */
 const ChevronDownIcon = ({ isOpen }) => (
   <svg
     className={`${styles.chevronIcon} ${isOpen ? styles.chevronOpen : ""}`}
@@ -20,15 +21,19 @@ const ChevronDownIcon = ({ isOpen }) => (
 );
 
 const SystemSettingsSection = () => {
+  /* 전역 설정 컨텍스트 연동 */
   const { settings, refreshSettings, loading: contextLoading } = useSettings();
 
+  /* 상태 관리 변수 선언 */
   const [allowOnDemand, setAllowOnDemand] = useState(true);
   const [showCrossContamModal, setShowCrossContamModal] = useState(false);
   const [cardCount, setCardCount] = useState("5개 노출(권장)");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  /* 드롭다운 선택 옵션 목록 */
   const options = ["3개 노출(기본)", "5개 노출(권장)", "10개 노출"];
 
+  /* 설정 데이터가 로드되면 로컬 상태 동기화 */
   useEffect(() => {
     if (settings) {
       setAllowOnDemand(settings.allow_on_demand);
@@ -37,6 +42,7 @@ const SystemSettingsSection = () => {
     }
   }, [settings]);
 
+  /* 설정 저장 핸들러 */
   const handleSave = async () => {
     const isConfirmed = window.confirm(
       "[주의] 시스템 설정을 변경하면 서비스 전체 기능 및 회원 화면에 즉시 영향을 미칩니다.\n\n정말로 이대로 변경 사항을 저장하시겠습니까?",
@@ -45,6 +51,7 @@ const SystemSettingsSection = () => {
     if (!isConfirmed) return;
 
     try {
+      /* Supabase DB에 변경된 설정값 업데이트 */
       const { error } = await supabase
         .from("admin_settings")
         .update({
@@ -61,6 +68,7 @@ const SystemSettingsSection = () => {
         return;
       }
 
+      /* 전역 설정 새로고침 */
       await refreshSettings();
 
       alert("시스템 설정이 Supabase DB에 성공적으로 저장되었습니다.");
@@ -70,18 +78,22 @@ const SystemSettingsSection = () => {
     }
   };
 
+  /* 로딩 중일 때의 화면 처리 */
   if (contextLoading) {
     return <div style={{ padding: "40px", textAlign: "center" }}>시스템 설정을 불러오는 중...</div>;
   }
 
   return (
     <div className={styles.container}>
+      {/* 상단 타이틀 영역 */}
       <div className={styles.header}>
         <h1 className={styles.title}>시스템 설정</h1>
         <p className={styles.subtitle}>한끼랩 관리자 권한 및 AI 임계값 세팅을 관리합니다.</p>
       </div>
 
+      {/* 설정 카드 영역 */}
       <div className={styles.card}>
+        {/* 1. 실시간 AI 레시피 변환 허용 토글 */}
         <div className={styles.settingItem}>
           <div className={styles.settingText}>
             <h3 className={styles.itemTitle}>버튼 클릭 시 실시간(On-Demand) AI 레시피 변환 허용</h3>
@@ -95,6 +107,7 @@ const SystemSettingsSection = () => {
           </label>
         </div>
 
+        {/* 2. 교차오염 위험 팝업 토글 */}
         <div className={styles.settingItem}>
           <div className={styles.settingText}>
             <h3 className={styles.itemTitle}>교차오염 위험 팝업 강제 노출</h3>
@@ -112,6 +125,7 @@ const SystemSettingsSection = () => {
           </label>
         </div>
 
+        {/* 3. 추천 카드 개수 선택 드롭다운 */}
         <div className={styles.selectGroup}>
           <div className={styles.settingText}>
             <h3 className={styles.itemTitle}>검색 결과 AI 실시간 대체 카드 기본 추천 개수</h3>
@@ -143,6 +157,7 @@ const SystemSettingsSection = () => {
           </div>
         </div>
 
+        {/* 하단 저장 버튼 영역 */}
         <div className={styles.saveBtnArea}>
           <button className={styles.saveBtn} onClick={handleSave}>
             설정 저장

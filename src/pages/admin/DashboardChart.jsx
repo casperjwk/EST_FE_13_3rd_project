@@ -15,6 +15,7 @@ import {
 import { supabase } from "../../lib/supabase";
 
 const DashboardChart = () => {
+  /* 테마 색상 상태 관리 */
   const [colors, setColors] = useState({
     primary: "var(--primary)",
     secondary: "var(--secondary)",
@@ -24,9 +25,11 @@ const DashboardChart = () => {
     gray2: "var(--gray-2)",
   });
 
+  /* 차트 데이터 상태 관리 */
   const [lineData, setLineData] = useState([]);
   const [pieData, setPieData] = useState([]);
 
+  /* 루트 요소에서 CSS 커스텀 속성 색상값 추출 */
   useEffect(() => {
     const rootStyle = getComputedStyle(document.documentElement);
     setColors({
@@ -39,10 +42,11 @@ const DashboardChart = () => {
     });
   }, []);
 
+  /* Supabase에서 차트용 데이터 비동기 조회 및 가공 */
   useEffect(() => {
     const fetchChartData = async () => {
       try {
-        // 1. 도넛 차트용: 모든 회원이 등록한 알레르기 전체 데이터와 알레르기 마스터 목록 가져오기
+        /* 1. 도넛 차트용: 회원 알레르기 등록 데이터 및 마스터 목록 조회 */
         const { data: userAllergiesData, error: allergyError } = await supabase
           .from("user_allergies")
           .select("allergen_id");
@@ -54,14 +58,12 @@ const DashboardChart = () => {
         if (allergensListError) throw allergensListError;
 
         if (userAllergiesData && allergensList) {
-          // 알레르기 ID별로 몇 명이나 체크했는지 빈도수 집계
           const counts = {};
           userAllergiesData.forEach(item => {
             const id = item.allergen_id;
             counts[id] = (counts[id] || 0) + 1;
           });
 
-          // 전체 체크된 알레르기 총 개수 (비율 계산용 분모)
           const totalCheckCount = userAllergiesData.length;
 
           const colorPalette = [
@@ -73,20 +75,19 @@ const DashboardChart = () => {
             colors.gray2,
           ];
 
-          // 각 알레르기별 비율(%) 계산
+          /* 알레르기별 비율 및 빈도 계산 */
           const calculatedPieData = allergensList
             .map((allergen, index) => {
               const count = counts[allergen.id] || 0;
-              // 전체 중 해당 알레르기가 차지하는 퍼센티지 계산
               const percentage = totalCheckCount > 0 ? Math.round((count / totalCheckCount) * 100) : 0;
               return {
                 name: allergen.name,
                 value: percentage,
-                count: count, // 실제 체크된 인원 수도 함께 보관
+                count: count,
                 color: colorPalette[index % colorPalette.length],
               };
             })
-            .filter(item => item.value > 0); // 0%인 것은 제외
+            .filter(item => item.value > 0);
 
           if (calculatedPieData.length > 0) {
             setPieData(calculatedPieData);
@@ -95,7 +96,7 @@ const DashboardChart = () => {
           }
         }
 
-        // 2. 꺾은선 차트용: profiles 테이블에서 실제 가입일(created_at) 가져와서 월별 누적 집계
+        /* 2. 꺾은선 차트용: 프로필 가입일 기반 월별 누적 집계 */
         const { data: profilesData, error: profileError } = await supabase.from("profiles").select("created_at");
 
         if (profileError) throw profileError;
@@ -122,10 +123,11 @@ const DashboardChart = () => {
           return {
             month: monthStr,
             userCount: cumulativeUsers,
-            aiCount: 0, // AI 검색량은 임시값 제거 후 0으로 깔끔하게 처리
+            aiCount: 0,
           };
         });
 
+        /* 최근 6개월 데이터만 추출 */
         const currentDate = new Date();
         const currentMonth = currentDate.getMonth() + 1;
         const startIndex = Math.max(0, currentMonth - 6);
