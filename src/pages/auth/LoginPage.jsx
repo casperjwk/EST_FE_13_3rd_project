@@ -151,7 +151,11 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
       }
     } else if (provider === "naver") {
       const NAVER_CLIENT_ID = "B3cP_MJX21Js9nHAJGrH";
-      const REDIRECT_URI = encodeURIComponent("http://localhost:5173");
+
+      /* 현재 접속 중인 환경의 주소를 동적으로 가져오도록 수정 */
+      const currentOrigin = window.location.origin;
+      const REDIRECT_URI = encodeURIComponent(currentOrigin);
+
       const STATE = Math.random().toString(36).substring(3);
 
       const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&state=${STATE}`;
