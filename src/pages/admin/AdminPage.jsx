@@ -100,7 +100,7 @@ const AdminPage = () => {
   const [currentProfile, setCurrentProfile] = useState(null);
 
   /* 전역 인증 정보 연동 */
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
 
   /* 관리자 권한 검증 및 최신 프로필 데이터 조회 로직 */
   useEffect(() => {
@@ -134,7 +134,7 @@ const AdminPage = () => {
           return;
         }
 
-        /* Supabase에서 최신 프로필 데이터를 직접 조회하여 동기화 문제 원천 차단 */
+        /* Supabase에서 내 계정의 최신 프로필 데이터를 직접 조회 */
         const { data: profileData } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
 
         if (profileData) {
@@ -152,10 +152,12 @@ const AdminPage = () => {
     checkAdminAuth();
   }, []);
 
-  /* 프로필 정보 변수 정의 (직접 조회한 최신 데이터 우선 반영) */
-  const profileImageUrl = currentProfile?.profile_image_url ?? profile?.profile_image_url ?? "";
-  const nickname = currentProfile?.nickname ?? profile?.nickname ?? "관리자";
-  const userEmail = user?.email ?? "";
+  /* 프로필 이미지 URL 안전하게 추출 (컬럼명 호환성 보장) 및 최신 데이터 반영 */
+  const profileImageUrl =
+    currentProfile?.profile_image_url || currentProfile?.avatar_url || currentProfile?.profile_img || "";
+
+  const nickname = currentProfile?.nickname ?? "한끼관리자";
+  const userEmail = user?.email ?? "test@han77ilab.com";
 
   /* 로딩 중이거나 권한이 없을 때의 화면 처리 */
   if (isLoading) {
