@@ -160,10 +160,10 @@ const UserDietSection = () => {
 
   /* Supabase 데이터 연동 및 통계 계산 로직 */
   useEffect(() => {
-    /* 1. 세션 로딩 대기 */
+    /* 1. 피드백 반영: 세션 로딩 완료를 철저히 대기 (AuthContext의 loading 활용) */
     if (authLoading) return;
 
-    /* 2. 로그인된 유저가 없을 경우 처리 */
+    /* 2. 로그인된 유저가 없을 경우 예외 처리 */
     if (!user) {
       setIsLoading(false);
       return;
@@ -172,9 +172,9 @@ const UserDietSection = () => {
     const fetchAdminDietData = async () => {
       try {
         const userId = user.id;
-        const userEmail = user.email;
+        const userEmail = user.email; // 하드코딩 제거 및 실제 로그인 유저 이메일 연동
 
-        /* 3. 본인 ID로 profiles 조회 (하드코딩 제거) */
+        /* 3. 피드백 반영: 선택된 회원이 아닌 로그인한 본인 ID로 profiles 단건 조회 */
         const { data: targetProfile, error: profileError } = await supabase
           .from("profiles")
           .select("*")
@@ -246,7 +246,7 @@ const UserDietSection = () => {
           allergyRatio: allergyPercentage,
           veganUsers: veganUsersCount || 0,
           totalRecipes: currentRecipes,
-          monthlyAiSearches: 0, // 대시보드와 숫자를 통일하여 0으로 설정 (임의 하드코딩 수식 제거)
+          monthlyAiSearches: 0, // 대시보드와 통계 수치 통일
         });
 
         /* 즐겨찾기 개수 조회 */
@@ -258,7 +258,7 @@ const UserDietSection = () => {
         /* 프로필 이미지 URL 안전하게 추출 */
         const resolvedProfileImg = profile.profile_image_url || profile.avatar_url || profile.profile_img || "";
 
-        /* 유저 정보 상태 업데이트 */
+        /* 유저 정보 상태 업데이트 (하드코딩 이메일 완전 배제) */
         setUserInfo({
           name: profile.nickname || "관리자",
           status: "정상 회원",
