@@ -134,7 +134,7 @@ const UserAvatarIcon = () => (
 );
 
 const UserDietSection = () => {
-  /* 통계 및 회원 데이터 상태 관리 */
+  /* 상태 관리 변수 선언 */
   const [stats, setStats] = useState({
     totalUsers: 0,
     allergyRatio: 0,
@@ -155,22 +155,25 @@ const UserDietSection = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  /* Supabase 실시간 데이터 연동 및 통계 */
+  /* Supabase 데이터 연동 및 통계 계산 로직 */
   useEffect(() => {
     const fetchAdminDietData = async () => {
       try {
+        /* 현재 로그인된 인증 유저 확인 */
         const {
           data: { user: authUser },
         } = await supabase.auth.getUser();
         let userId = authUser?.id;
         let userEmail = authUser?.email || "";
 
+        /* 프로필 정보 조회 */
         let profileData = null;
         if (userId) {
           const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
           profileData = data;
         }
 
+        /* 로그인 유저 프로필이 없을 경우 기본값 폴백 처리 */
         if (!profileData) {
           const { data: firstProfile } = await supabase.from("profiles").select("*").limit(1).maybeSingle();
           if (firstProfile) {
@@ -182,6 +185,7 @@ const UserDietSection = () => {
         const targetProfile = profileData || {};
         const formattedJoinDate = targetProfile.created_at ? targetProfile.created_at.split("T")[0] : "2026-00-00";
 
+        /* 비건 유형 정보 조회 */
         let veganInfo = {
           name: "일반 식단 (지정 안 함)",
           status: "미적용",
@@ -202,6 +206,7 @@ const UserDietSection = () => {
           }
         }
 
+        /* 유저 알레르기 정보 조회 */
         let allergyNames = [];
         if (userId) {
           const { data: userAllergiesData } = await supabase
@@ -218,7 +223,7 @@ const UserDietSection = () => {
         const appliedConditions = [...allergyNames.map(name => ({ text: `${name} 제외`, type: "danger" }))];
         if (targetProfile.vegan_type_id) appliedConditions.push({ text: `${veganInfo.name} 가이드`, type: "primary" });
 
-        /* Supabase 테이블에서 실시간 카운트 조회 */
+        /* 통계 데이터 집계 */
         const { count: totalUsersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
         const { count: veganUsersCount } = await supabase
           .from("profiles")
@@ -246,6 +251,7 @@ const UserDietSection = () => {
           monthlyAiSearches: currentRecipes * 12 + currentUsers * 15,
         });
 
+        /* 즐겨찾기 개수 조회 */
         let favCount = 0;
         if (userId) {
           const { count: favoriteCount } = await supabase
@@ -255,12 +261,17 @@ const UserDietSection = () => {
           favCount = favoriteCount || 0;
         }
 
+        /* 프로필 이미지 URL 안전하게 추출 (컬럼명 호환성 보장) */
+        const resolvedProfileImg =
+          targetProfile.profile_image_url || targetProfile.avatar_url || targetProfile.profile_img || "";
+
+        /* 유저 정보 상태 업데이트 */
         setUserInfo({
           name: targetProfile.nickname || "관리자",
           status: "정상 회원",
           email: userEmail || "admin@han77ilab.com",
           joinDate: formattedJoinDate,
-          profileImageUrl: targetProfile.profile_image_url || "",
+          profileImageUrl: resolvedProfileImg,
           favoritesCount: favCount,
           allergies: allergyNames,
           veganType: veganInfo,
@@ -276,6 +287,7 @@ const UserDietSection = () => {
     fetchAdminDietData();
   }, []);
 
+  /* 상단 통계 카드 데이터 배열 */
   const statCards = [
     { id: "totalUsers", label: "전체 가입 회원", value: `${stats.totalUsers.toLocaleString()}명`, icon: <UsersIcon /> },
     { id: "allergyRatio", label: "알레르기 보유 비율", value: `${stats.allergyRatio}%`, icon: <PercentIcon /> },
@@ -289,15 +301,18 @@ const UserDietSection = () => {
     },
   ];
 
+  /* 로딩 상태 화면 처리 */
   if (isLoading) return <div style={{ padding: "40px", textAlign: "center" }}>데이터 불러오는 중...</div>;
 
   return (
     <div className={styles.container}>
+      {/* 헤더 타이틀 영역 */}
       <div className={styles.header}>
         <h1 className={styles.title}>회원 맞춤 식단 DB 관리자</h1>
         <p className={styles.subtitle}>등록된 회원의 알레르기 및 비건 조건 데이터를 조회하고 수정합니다.</p>
       </div>
 
+      {/* 통계 지표 그리드 영역 */}
       <div className={styles.statsGrid}>
         {statCards.map(item => (
           <div key={item.id} className={styles.statCard}>
@@ -310,6 +325,7 @@ const UserDietSection = () => {
         ))}
       </div>
 
+      {/* 식단 정보 및 회원 프로필 카드 */}
       <div className={styles.contentCard}>
         <h2 className={styles.cardTitle}>식단 정보</h2>
         <div className={styles.userProfileBox}>
@@ -346,6 +362,7 @@ const UserDietSection = () => {
           </div>
         </div>
 
+        {/* 보유 알레르기 섹션 */}
         <div className={styles.sectionBlock}>
           <div className={styles.sectionHeader}>
             <h3 className={`${styles.sectionTitle} ${styles.dangerTitle}`}>
@@ -367,6 +384,7 @@ const UserDietSection = () => {
           </div>
         </div>
 
+        {/* 지정 비건 유형 섹션 */}
         <div className={styles.sectionBlock}>
           <h3 className={`${styles.sectionTitle} ${styles.primaryTitle}`}>
             <LeafIcon />
