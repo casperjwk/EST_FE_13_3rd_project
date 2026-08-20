@@ -98,7 +98,6 @@ const AdminPage = () => {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  /* 전역 인증 및 프로필 정보 연동 */
   const { user, profile } = useAuth();
   const profileImageUrl = profile?.profile_image_url ?? "";
   const nickname = profile?.nickname ?? "관리자";

@@ -155,7 +155,7 @@ const UserDietSection = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  /* Supabase 실시간 데이터 연동 및 통계 계산 */
+  /* Supabase 실시간 데이터 연동 및 통계 */
   useEffect(() => {
     const fetchAdminDietData = async () => {
       try {
