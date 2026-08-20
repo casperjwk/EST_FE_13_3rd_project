@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import styles from "./UserDietSection.module.css";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext"; // 전역 인증 훅 import
 
 /* 단색 선 SVG 아이콘 모음 */
 const UsersIcon = () => (
@@ -135,6 +136,8 @@ const UserAvatarIcon = () => (
 
 const UserDietSection = () => {
   /* 상태 관리 변수 선언 */
+  const { user, loading: authLoading } = useAuth();
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     allergyRatio: 0,
@@ -155,22 +158,33 @@ const UserDietSection = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  /* Supabase 데이터 연동 및 통계 계산 로직 (사이드바와 동일하게 이메일 기준으로 통일) */
+  /* Supabase 데이터 연동 및 통계 계산 로직 */
   useEffect(() => {
+    /* 1. 세션 로딩 대기 */
+    if (authLoading) return;
+
+    /* 2. 로그인된 유저가 없을 경우 처리 */
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchAdminDietData = async () => {
       try {
-        /* 현재 로그인된 인증 유저 확인 */
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-        let userEmail = authUser?.email || "test@han77ilab.com";
+        const userId = user.id;
+        const userEmail = user.email;
 
-        /* 이메일을 기준으로 profiles 테이블에서 내 프로필 단건 조회 */
-        const { data: profileData } = await supabase.from("profiles").select("*").eq("email", userEmail).maybeSingle();
+        /* 3. 본인 ID로 profiles 조회 (하드코딩 제거) */
+        const { data: targetProfile, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle();
 
-        const targetProfile = profileData || {};
-        let userId = targetProfile.id || authUser?.id;
-        const formattedJoinDate = targetProfile.created_at ? targetProfile.created_at.split("T")[0] : "2026-00-00";
+        if (profileError) throw profileError;
+
+        const profile = targetProfile || {};
+        const formattedJoinDate = profile.created_at ? profile.created_at.split("T")[0] : "2026-00-00";
 
         /* 비건 유형 정보 조회 */
         let veganInfo = {
@@ -178,11 +192,11 @@ const UserDietSection = () => {
           status: "미적용",
           description: "선택된 비건 식단이 없습니다.",
         };
-        if (targetProfile.vegan_type_id) {
+        if (profile.vegan_type_id) {
           const { data: veganTypeData } = await supabase
             .from("vegan_types")
             .select("name, description")
-            .eq("id", targetProfile.vegan_type_id)
+            .eq("id", profile.vegan_type_id)
             .maybeSingle();
           if (veganTypeData) {
             veganInfo = {
@@ -195,20 +209,18 @@ const UserDietSection = () => {
 
         /* 유저 알레르기 정보 조회 */
         let allergyNames = [];
-        if (userId) {
-          const { data: userAllergiesData } = await supabase
-            .from("user_allergies")
-            .select("allergen_id")
-            .eq("user_id", userId);
-          if (userAllergiesData?.length > 0) {
-            const allergenIds = userAllergiesData.map(item => item.allergen_id);
-            const { data: allergensData } = await supabase.from("allergens").select("name").in("id", allergenIds);
-            if (allergensData) allergyNames = allergensData.map(a => a.name);
-          }
+        const { data: userAllergiesData } = await supabase
+          .from("user_allergies")
+          .select("allergen_id")
+          .eq("user_id", userId);
+        if (userAllergiesData?.length > 0) {
+          const allergenIds = userAllergiesData.map(item => item.allergen_id);
+          const { data: allergensData } = await supabase.from("allergens").select("name").in("id", allergenIds);
+          if (allergensData) allergyNames = allergensData.map(a => a.name);
         }
 
         const appliedConditions = [...allergyNames.map(name => ({ text: `${name} 제외`, type: "danger" }))];
-        if (targetProfile.vegan_type_id) appliedConditions.push({ text: `${veganInfo.name} 가이드`, type: "primary" });
+        if (profile.vegan_type_id) appliedConditions.push({ text: `${veganInfo.name} 가이드`, type: "primary" });
 
         /* 통계 데이터 집계 */
         const { count: totalUsersCount } = await supabase.from("profiles").select("*", { count: "exact", head: true });
@@ -220,7 +232,6 @@ const UserDietSection = () => {
 
         const currentUsers = totalUsersCount || 0;
         const currentRecipes = recipesCount || 0;
-
         let allergyPercentage = 0;
         if (currentUsers > 0) {
           const { data: allergyData } = await supabase.from("user_allergies").select("user_id");
@@ -235,31 +246,26 @@ const UserDietSection = () => {
           allergyRatio: allergyPercentage,
           veganUsers: veganUsersCount || 0,
           totalRecipes: currentRecipes,
-          monthlyAiSearches: currentRecipes * 12 + currentUsers * 15,
+          monthlyAiSearches: 0, // 대시보드와 숫자를 통일하여 0으로 설정 (임의 하드코딩 수식 제거)
         });
 
         /* 즐겨찾기 개수 조회 */
-        let favCount = 0;
-        if (userId) {
-          const { count: favoriteCount } = await supabase
-            .from("favorites")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", userId);
-          favCount = favoriteCount || 0;
-        }
+        const { count: favoriteCount } = await supabase
+          .from("favorites")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", userId);
 
-        /* 프로필 이미지 URL 안전하게 추출 (사이드바와 동일한 컬럼명 우선순위 적용) */
-        const resolvedProfileImg =
-          targetProfile.profile_image_url || targetProfile.avatar_url || targetProfile.profile_img || "";
+        /* 프로필 이미지 URL 안전하게 추출 */
+        const resolvedProfileImg = profile.profile_image_url || profile.avatar_url || profile.profile_img || "";
 
         /* 유저 정보 상태 업데이트 */
         setUserInfo({
-          name: targetProfile.nickname || "한끼관리자",
+          name: profile.nickname || "관리자",
           status: "정상 회원",
           email: userEmail,
           joinDate: formattedJoinDate,
           profileImageUrl: resolvedProfileImg,
-          favoritesCount: favCount,
+          favoritesCount: favoriteCount || 0,
           allergies: allergyNames,
           veganType: veganInfo,
           appliedConditions:
@@ -272,7 +278,7 @@ const UserDietSection = () => {
       }
     };
     fetchAdminDietData();
-  }, []);
+  }, [user, authLoading]);
 
   /* 상단 통계 카드 데이터 배열 */
   const statCards = [

@@ -5,7 +5,7 @@ import UserDietSection from "./UserDietSection";
 import SystemSettingsSection from "./SystemSettingsSection";
 import styles from "./AdminPage.module.css";
 import { supabase } from "../../lib/supabase";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContext"; // 전역 인증 훅 import
 
 /* 사이드바 메뉴 및 아바타 아이콘 컴포넌트 */
 const DashboardIcon = () => (
@@ -98,31 +98,29 @@ const AdminPage = () => {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentProfile, setCurrentProfile] = useState(null);
-  const [userEmail, setUserEmail] = useState("test@han77ilab.com");
 
-  /* 관리자 권한 검증 및 이메일 기준 최신 프로필 데이터 조회 로직 */
+  /* 전역 인증 정보 및 로딩 상태 연동 (하드코딩 제거) */
+  const { user, loading: authLoading } = useAuth();
+
+  /* 관리자 권한 검증 및 최신 프로필 데이터 조회 로직 */
   useEffect(() => {
+    /* 1. 세션 로딩 완료 대기 */
+    if (authLoading) return;
+
+    /* 2. 로그인된 유저가 없을 경우 예외 처리 */
+    if (!user) {
+      alert("로그인이 필요한 페이지입니다.");
+      window.location.href = "/login";
+      return;
+    }
+
     const checkAdminAuth = async () => {
       try {
-        const {
-          data: { user: authUser },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError || !authUser) {
-          alert("로그인이 필요한 페이지입니다.");
-          window.location.href = "/login";
-          return;
-        }
-
-        const email = authUser.email || "test@han77ilab.com";
-        setUserEmail(email);
-
         /* 관리자 권한 확인 */
         const { data: adminData, error: adminError } = await supabase
           .from("admins")
           .select("*")
-          .eq("user_id", authUser.id)
+          .eq("user_id", user.id)
           .maybeSingle();
 
         if (adminError) throw adminError;
@@ -135,8 +133,8 @@ const AdminPage = () => {
           return;
         }
 
-        /* Supabase에서 이메일 기준으로 프로필 데이터 단건 조회 */
-        const { data: profileData } = await supabase.from("profiles").select("*").eq("email", email).maybeSingle();
+        /* Supabase에서 본인 ID로 프로필 데이터 단건 조회 */
+        const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
 
         if (profileData) {
           setCurrentProfile(profileData);
@@ -151,13 +149,14 @@ const AdminPage = () => {
     };
 
     checkAdminAuth();
-  }, []);
+  }, [user, authLoading]);
 
-  /* 프로필 정보 안전하게 추출 (컬럼명 호환성 보장) */
+  /* 프로필 정보 안전하게 추출 (컬럼명 호환성 보장) 및 최신 데이터 반영 */
   const profileImageUrl =
     currentProfile?.profile_image_url || currentProfile?.avatar_url || currentProfile?.profile_img || "";
 
-  const nickname = currentProfile?.nickname || "한끼관리자";
+  const nickname = currentProfile?.nickname || "관리자";
+  const userEmail = user?.email || "";
 
   /* 로딩 중이거나 권한이 없을 때의 화면 처리 */
   if (isLoading) {
