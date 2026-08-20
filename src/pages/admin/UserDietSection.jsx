@@ -166,20 +166,11 @@ const UserDietSection = () => {
         let userId = authUser?.id;
         let userEmail = authUser?.email || "";
 
-        /* 프로필 정보 조회 */
+        /* 로그인된 내 계정의 프로필 정보만 정확히 조회 */
         let profileData = null;
         if (userId) {
           const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
           profileData = data;
-        }
-
-        /* 로그인 유저 프로필이 없을 경우 기본값 폴백 처리 */
-        if (!profileData) {
-          const { data: firstProfile } = await supabase.from("profiles").select("*").limit(1).maybeSingle();
-          if (firstProfile) {
-            profileData = firstProfile;
-            userId = firstProfile.id;
-          }
         }
 
         const targetProfile = profileData || {};
