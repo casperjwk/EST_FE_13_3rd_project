@@ -246,7 +246,7 @@ const UserDietSection = () => {
           allergyRatio: allergyPercentage,
           veganUsers: veganUsersCount || 0,
           totalRecipes: currentRecipes,
-          monthlyAiSearches: currentRecipes * 12 + currentUsers * 15,
+          monthlyAiSearches: 0, // 대시보드와 숫자를 통일하여 0으로 설정 (임의 하드코딩 수식 제거)
         });
 
         /* 즐겨찾기 개수 조회 */
