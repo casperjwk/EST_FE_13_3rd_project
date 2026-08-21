@@ -130,12 +130,14 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
       localStorage.setItem("keepLoggedIn", "true");
     }
 
+    const currentOrigin = window.location.origin; // 현재 접속 중인 도메인 자동 감지 (배포 주소 또는 로컬)
+
     if (provider === "kakao") {
       try {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "kakao",
           options: {
-            redirectTo: "http://localhost:5173",
+            redirectTo: currentOrigin, // 동적 주소 적용
             queryParams: {
               prompt: "login",
             },
@@ -151,10 +153,7 @@ export default function LoginPage({ onGoToSignup, onLoginSuccess }) {
       }
     } else if (provider === "naver") {
       const NAVER_CLIENT_ID = "B3cP_MJX21Js9nHAJGrH";
-
-      /* 현재 접속 중인 환경의 주소를 동적으로 가져오도록 수정 */
-      const currentOrigin = window.location.origin;
-      const REDIRECT_URI = encodeURIComponent(currentOrigin);
+      const REDIRECT_URI = encodeURIComponent(currentOrigin); // 동적 주소 적용
 
       const STATE = Math.random().toString(36).substring(3);
 
